@@ -161,8 +161,9 @@ class Sandbox:
         self, script: str, user: str = "root", timeout: float = 120, env: dict[str, str] | None = None,
         args: list[str] | None = None,
     ) -> ExecResult:
-        """Pipe a stdlib-only Python script in via stdin, run with `python3 -I -` (isolated mode)."""
-        return self.exec(["/usr/local/bin/python3", "-I", "-", *(args or [])], user=user, stdin=script,
+        """Pipe a stdlib-only Python script in via stdin, run with `python3 -I -B -` (isolated mode, and
+        no bytecode written: a fresh .pyc in the system Python would date the instrumentation, D42)."""
+        return self.exec(["/usr/local/bin/python3", "-I", "-B", "-", *(args or [])], user=user, stdin=script,
                          timeout=timeout, env=env)
 
     # ---- observation -----------------------------------------------------

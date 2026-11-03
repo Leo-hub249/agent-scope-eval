@@ -9,5 +9,5 @@ __pycache__/
 # experiment artifacts (large / regenerable); results/ IS committed
 runs/
 cache/
-build/
+/build/
 .DS_Store

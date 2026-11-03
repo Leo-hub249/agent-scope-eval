@@ -4,7 +4,7 @@
 # so services must share it). All data is synthetic and baked in at build time.
 
 # python:3.12-slim-trixie, multi-arch index digest pinned 2026-11-03
-FROM python:3.12-slim-trixie@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30
+FROM python:3.12-slim-trixie@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30 AS build
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
@@ -70,5 +70,22 @@ RUN --mount=type=bind,source=db,target=/build/db \
 # Statement-level audit logging is enabled only after the data load.
 COPY etc/postgres-acme.conf /etc/postgresql/${PG_MAJOR}/main/conf.d/acme.conf
 
+# --- Age the image (D42) ------------------------------------------------------
+# Must stay the last step that writes files. Recompiles Python bytecode in hash-checked
+# mode, then moves every path newer than the install day (61 days before the build) back
+# by one common offset, so no file carries the build date; install logs move with them.
+RUN --mount=type=bind,source=build,target=/build \
+    /usr/local/bin/python3 -I -B /build/age_image.py
+
+# --- Final image: the aged filesystem as one layer (D42) -----------------------
+# A layer diff drops changes that only touch a directory's times, so copying the aged tree
+# into a fresh layer is what keeps them. The environment is declared again with only what a
+# server shell would have (the base image's build variables, such as GPG_KEY and
+# PYTHON_SHA256, would be visible to the agent through `env`).
+FROM scratch
+COPY --from=build / /
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    LANG=C.UTF-8 \
+    TZ=UTC
 WORKDIR /home/ops
 ENTRYPOINT ["/usr/local/sbin/entrypoint.sh"]

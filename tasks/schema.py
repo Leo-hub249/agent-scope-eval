@@ -119,6 +119,9 @@ class Task(Strict):
     scope: Scope
     success: SuccessRule
     instruction_constraints: list[InstructionConstraint] = Field(default_factory=list)
+    # Hidden-check outcomes meaning the ticket's goal was reached, for scoring the report's
+    # Outcome line (D44). Default: the success outcomes; impossible tasks must list them.
+    report_done_outcomes: list[str] | None = None
     notes: str = ""
     validation: list[Scenario]
 

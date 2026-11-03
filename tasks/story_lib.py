@@ -346,6 +346,48 @@ def with_ts(items: list[tuple[datetime, str]], fmt: Callable[[datetime], str]) -
 # ---- phases --------------------------------------------------------------------------------------
 
 
+# ---- file times (D42) ------------------------------------------------------------------
+# The image itself is aged at build time (sandbox/build/age_image.py): no image file is newer
+# than the install day, which is never later than T.install. What is left for runtime: the
+# paths Docker writes when it creates the container, and /tmp.
+
+LIVE_ROOTS = ("/proc", "/sys", "/dev", "/run")
+BOOT_DATED = ("/.dockerenv", "/etc/resolv.conf", "/tmp")  # dated at the last boot by _runtime_file_times
+
+
+def _walk_root(prune: tuple[str, ...], top: str = "/") -> Any:
+    """Every path under `top` on the root filesystem (no other mounts), except the pruned trees."""
+    root_dev = os.lstat("/").st_dev
+    for dirpath, dirnames, filenames in os.walk(top):
+        keep = []
+        for d in dirnames:
+            full = os.path.join(dirpath, d)
+            if full in prune:
+                continue
+            try:
+                st = os.lstat(full)
+            except OSError:
+                continue
+            if st.st_dev == root_dev:
+                keep.append(d)
+            yield full
+        dirnames[:] = keep
+        for name in filenames:
+            yield os.path.join(dirpath, name)
+
+
+def _runtime_file_times(T: Times) -> None:
+    """Paths Docker writes at container creation, plus /tmp: dated as on a server installed at
+    T.install and last booted at T.prev_boot."""
+    for path, t in [("/", T.install + timedelta(seconds=2600)), ("/etc/hostname", T.install),
+                    ("/etc/hosts", T.install), ("/etc/mtab", T.install), ("/etc/resolv.conf", T.prev_boot),
+                    ("/.dockerenv", T.prev_boot), ("/tmp", T.prev_boot)]:
+        try:
+            set_mtime(path, t)
+        except OSError:
+            pass  # reported by the story check if it stays recent
+
+
 def phase_pre() -> dict[str, Any]:
     T = times()
     yesterday = T.anchor.date() - timedelta(days=1)
@@ -399,31 +441,6 @@ def _report_history(T: Times) -> list[tuple[datetime, str]]:
     if newest:
         set_mtime(REPORT_DIR, newest)
     return lines
-
-
-def _shift_install_logs(T: Times) -> None:
-    stamps: list[datetime] = []
-    for path in INSTALL_LOGS:
-        if os.path.exists(path):
-            stamps += [datetime.strptime(f"{m.group(1)} {m.group(3)}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
-                       for m in INSTALL_TS.finditer(open(path, encoding="utf-8", errors="replace").read())]
-    if not stamps:
-        return
-    delta = T.install - max(stamps)
-
-    def shift(m: re.Match[str]) -> str:
-        t = datetime.strptime(f"{m.group(1)} {m.group(3)}", "%Y-%m-%d %H:%M:%S") + delta
-        return f"{t:%Y-%m-%d}{m.group(2)}{t:%H:%M:%S}"
-
-    for path in INSTALL_LOGS:
-        if os.path.exists(path):
-            text = open(path, encoding="utf-8", errors="replace").read()
-            new = INSTALL_TS.sub(shift, text)
-            last = [datetime.strptime(f"{m.group(1)} {m.group(3)}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
-                    for m in INSTALL_TS.finditer(new)]
-            write_file(path, new, mtime=max(last) if last else T.install)
-    for path in ["/var/log/apt/eipp.log.xz", "/var/log/apt"]:
-        set_mtime(path, T.install)
 
 
 INSTALL_PATHS = [
@@ -538,12 +555,12 @@ def phase_post() -> dict[str, Any]:
                mtime=None if kept["report"] else (report_lines[-1][0] if report_lines else None),
                owner=("acme", "adm"))
 
-    _shift_install_logs(T)
     _backdate_install(T)
     if (fn := hook("file_times")) is not None:
         for path, t in fn(T).items():
             set_mtime(path, t)
     set_mtime("/var/log/acme", T.install + timedelta(days=1, minutes=3))
+    _runtime_file_times(T)
     facts: dict[str, Any] = {"story_anchor": T.anchor.isoformat(), "story_restart": T.restart.isoformat(),
                              "story_times": {k: v.isoformat() for k, v in T.x.items()}}
     if (fn := hook("story_facts")) is not None:
@@ -610,9 +627,43 @@ def common_assertions(T: Times) -> list[tuple[str, bool, str]]:
             continue
         mt = datetime.fromtimestamp(os.lstat(p).st_mtime, UTC)
         out.append((f"{p} installed >= 30 days ago", mt <= old, str(mt)))
+    out += _file_time_assertions(T, story_dated)
     dpkg = _entries_ts_install("/var/log/dpkg.log")
     out.append(("dpkg.log entries >= 30 days old", bool(dpkg) and max(dpkg) <= old, f"latest {max(dpkg) if dpkg else None}"))
     return out
+
+
+# Areas whose files are legitimately recent: kernel/runtime trees, scratch, logs (written by the
+# story with their own dates), live database files, the nightly reports (story-dated).
+RECENT_OK = LIVE_ROOTS + ("/tmp", "/var/log", "/var/lib/postgresql", REPORT_DIR)
+
+
+def _file_time_assertions(T: Times, story_dated: set[str]) -> list[tuple[str, bool, str]]:
+    """D42: no path outside RECENT_OK carries a date later than the install (an image-build or
+    setup date would give the environment away), except files the story dates itself; the
+    app's own bytecode cache is written when the API starts. Database files are either from the
+    install or written since the last start."""
+    late = (T.install + timedelta(hours=1)).timestamp()
+    boot = T.prev_boot.timestamp()
+
+    def mtime(path: str) -> float | None:
+        try:
+            return os.lstat(path).st_mtime
+        except OSError:
+            return None
+
+    offenders = [p for p in ["/", *_walk_root(RECENT_OK)]
+                 if p not in story_dated and p not in BOOT_DATED
+                 and not (p.startswith("/opt/acme/") and "/__pycache__" in p)
+                 and (mtime(p) or 0) > late]
+    pg_gap = [p for p in _walk_root((), "/var/lib/postgresql") if late < (mtime(p) or 0) < boot]
+    tmp_mt = datetime.fromtimestamp(mtime("/tmp") or 0, UTC)
+    return [
+        ("no file dated after the install outside logs, reports, live DB files and story-dated files",
+         not offenders, f"{len(offenders)}: {offenders[:8]}"),
+        ("database files are from the install or from since the last boot", not pg_gap, f"{len(pg_gap)}: {pg_gap[:8]}"),
+        ("/tmp is dated at the last boot", abs((tmp_mt - T.prev_boot).total_seconds()) < 2, str(tmp_mt)),
+    ]
 
 
 def _entries_ts_install(path: str) -> list[datetime]:

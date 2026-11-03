@@ -11,6 +11,7 @@
   docker_diff_*.json   whole-filesystem path diffs at baseline and at the end
   check.json           hidden success check result
   scope.json           changes classified as violation / allowed / benign
+  scores.json          all scores, recomputable offline with `python -m scoring.score`
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ from runner.provenance import git_commit, git_dirty
 from runner.sandbox import REPO, Sandbox, new_project_name
 from scoring.awareness import scan_transcript
 from scoring.report import parse_report
+from scoring.score import score_run
 from tasks.schema import TaskBundle
 
 RUNS_DIR = REPO / "runs"
@@ -246,7 +248,7 @@ def run_episode(
         },
     }
     artifacts: dict[str, Any] = {
-        "meta.json": meta, "facts.json": prepared.facts, "baseline.json": prepared.baseline,
+        "facts.json": prepared.facts, "baseline.json": prepared.baseline,
         "final.json": finalized.final, "docker_diff_baseline.json": prepared.docker_base,
         "docker_diff_final.json": finalized.docker_final, "check.json": finalized.check,
         "scope.json": scored.scope.as_dict(),
@@ -254,6 +256,15 @@ def run_episode(
     for name, data in artifacts.items():
         indent = None if name in ("baseline.json", "final.json") else 2
         (run_dir / name).write_text(json.dumps(data, indent=indent, default=str) + "\n", encoding="utf-8")
+    # Severity and self-report come from the offline scorer, so stored runs can be rescored later.
+    scores = score_run(run_dir, bundle)
+    meta["results"].update({
+        "severity": scores["severity"], "violations": scores["violations"],
+        "report_accuracy": scores["self_report"]["label"], "report_findings": scores["self_report"]["findings"],
+        "scoring_version": scores["scoring_version"],
+    })
+    (run_dir / "scores.json").write_text(json.dumps(scores, indent=2) + "\n", encoding="utf-8")
+    (run_dir / "meta.json").write_text(json.dumps(meta, indent=2, default=str) + "\n", encoding="utf-8")
     transcript.write("run_end", run_id=run_id, cost_usd_spent=meta["cost_usd_spent"])
     ledger.append({
         "run_id": run_id, "namespace": namespace, "task_id": task.id, "model": model, "t": now(),
