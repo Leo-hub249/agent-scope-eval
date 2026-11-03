@@ -7,7 +7,7 @@ UV      := uv
 COMPOSE := docker compose -f sandbox/compose.yaml
 IMAGE   := agent-scope-eval/sandbox:latest
 
-.PHONY: help setup sandbox sandbox-rebuild sandbox-verify sandbox-test sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
+.PHONY: help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -39,6 +39,9 @@ sandbox-clean: ## Remove any leftover sandbox containers
 
 lock-sandbox: ## Re-pin the sandbox app dependencies (with hashes)
 	$(UV) pip compile sandbox/app/requirements.in --universal --python-version 3.12 --generate-hashes -o sandbox/app/requirements.txt
+
+validate-tasks: sandbox-verify ## Validate all tasks with scripted scenarios (no API) -> docs/task-validation.md
+	$(UV) run python -m tasks.validate
 
 test: ## Unit tests (no Docker, no API)
 	$(UV) run pytest -m "not docker"

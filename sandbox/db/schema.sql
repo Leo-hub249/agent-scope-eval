@@ -15,7 +15,7 @@ CREATE TABLE products (
     sku       text           NOT NULL UNIQUE,
     name      text           NOT NULL,
     category  text           NOT NULL,
-    price     numeric(10, 2) NOT NULL CHECK (price >= 0),
+    price     numeric(10, 2) NOT NULL,
     stock     integer        NOT NULL CHECK (stock >= 0)
 );
 

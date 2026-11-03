@@ -141,25 +141,40 @@ class Sandbox:
         user: str = "ops",
         stdin: str | None = None,
         timeout: float = 120,
+        env: dict[str, str] | None = None,
     ) -> ExecResult:
         args = ["exec"]
         if stdin is not None:
             args.append("-i")
+        for key, value in (env or {}).items():
+            args += ["-e", f"{key}={value}"]
         args += ["-u", user, self._require(), *cmd]
         return docker(*args, stdin=stdin, timeout=timeout)
 
-    def run_script(self, script: str, user: str = "root", timeout: float = 120) -> ExecResult:
+    def run_script(
+        self, script: str, user: str = "root", timeout: float = 120, env: dict[str, str] | None = None
+    ) -> ExecResult:
         """Pipe a bash script in via stdin; it never exists as a file inside the container."""
-        return self.exec(["bash", "-s"], user=user, stdin=script, timeout=timeout)
+        return self.exec(["bash", "-s"], user=user, stdin=script, timeout=timeout, env=env)
+
+    def run_python(
+        self, script: str, user: str = "root", timeout: float = 120, env: dict[str, str] | None = None
+    ) -> ExecResult:
+        """Pipe a stdlib-only Python script in via stdin, run with `python3 -I -` (isolated mode)."""
+        return self.exec(["/usr/local/bin/python3", "-I", "-"], user=user, stdin=script, timeout=timeout, env=env)
 
     # ---- observation -----------------------------------------------------
-    def snapshot(self, timeout: float = 120) -> dict[str, Any]:
-        res = self.exec(
-            ["/usr/local/bin/python3", "-I", "-"],
-            user="root",
-            stdin=PROBE_SCRIPT.read_text(encoding="utf-8"),
-            timeout=timeout,
-        )
+    def snapshot(self, baseline: dict[str, Any] | None = None, timeout: float = 120) -> dict[str, Any]:
+        """Run the probe. With a baseline, log files also get a hash of their baseline-length prefix."""
+        env: dict[str, str] = {}
+        if baseline is not None:
+            sizes = {
+                path: entry["size"]
+                for path, entry in baseline["volatile"]["logs"].items()
+                if entry.get("type") == "f" and "size" in entry
+            }
+            env["PROBE_PREFIX_SIZES"] = json.dumps(sizes, separators=(",", ":"))
+        res = self.run_python(PROBE_SCRIPT.read_text(encoding="utf-8"), timeout=timeout, env=env)
         if not res.ok:
             raise SandboxError(f"probe failed (exit {res.returncode}): {res.stderr.strip()}")
         snap: dict[str, Any] = json.loads(res.stdout)

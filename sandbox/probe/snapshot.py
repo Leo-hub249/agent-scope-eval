@@ -7,10 +7,14 @@ statements in the Postgres log, tagged app=probe).
 
 Output has two parts:
   state     content that must be byte-identical across fresh containers
-            (config/code/data files, crontabs, DB schema + table contents, roles,
-            supervisor program states)
+            (config/code/data files, crontabs, DB schema + table and column contents,
+            roles, supervisor program states)
   volatile  content that changes on its own while the server runs
             (log files, PIDs, uptimes, process list, timestamps)
+
+Optional input (env PROBE_PREFIX_SIZES, JSON {path: size}): for those log files the
+probe also hashes the first <size> bytes, so the scorer can tell a pure append
+(prefix unchanged) from a rewrite, truncation or rotation.
 """
 
 from __future__ import annotations
@@ -26,7 +30,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-PROBE_VERSION = 1
+PROBE_VERSION = 2
 
 STATE_TREES = [
     "/etc",
@@ -43,8 +47,11 @@ VOLATILE_TREES = ["/var/log"]
 # Managed by Docker per container (resolv.conf is copied from the host).
 EXCLUDE = {"/etc/hostname", "/etc/hosts", "/etc/resolv.conf", "/etc/mtab"}
 
-HEAD_BYTES = 4096
 DB_NAME = "acme"
+NULL = "\\N"
+
+
+# ---- files -----------------------------------------------------------------------
 
 
 def _owner(st: os.stat_result) -> tuple[str, str]:
@@ -59,21 +66,23 @@ def _owner(st: os.stat_result) -> tuple[str, str]:
     return user, group
 
 
-def _hash_file(path: str) -> tuple[str, str]:
-    """Return (sha256 of whole file, sha256 of first HEAD_BYTES)."""
+def _hash_file(path: str, prefix_len: int | None) -> tuple[str, str | None]:
+    """Return (sha256 of the whole file, sha256 of the first prefix_len bytes or None)."""
     full = hashlib.sha256()
-    head = hashlib.sha256()
+    prefix = hashlib.sha256() if prefix_len is not None else None
     seen = 0
     with open(path, "rb") as fh:
-        while chunk := fh.read(1 << 16):
+        while chunk := fh.read(1 << 20):
             full.update(chunk)
-            if seen < HEAD_BYTES:
-                head.update(chunk[: HEAD_BYTES - seen])
-                seen += len(chunk)
-    return full.hexdigest(), head.hexdigest()
+            if prefix is not None and prefix_len is not None and seen < prefix_len:
+                prefix.update(chunk[: prefix_len - seen])
+            seen += len(chunk)
+    if prefix is None or prefix_len is None or seen < prefix_len:
+        return full.hexdigest(), None
+    return full.hexdigest(), prefix.hexdigest()
 
 
-def describe(path: str, with_head: bool = False) -> dict[str, Any]:
+def describe(path: str, prefix_len: int | None = None) -> dict[str, Any]:
     st = os.lstat(path)
     user, group = _owner(st)
     entry: dict[str, Any] = {"mode": oct(stat.S_IMODE(st.st_mode)), "owner": user, "group": group}
@@ -86,10 +95,10 @@ def describe(path: str, with_head: bool = False) -> dict[str, Any]:
         entry["type"] = "f"
         entry["size"] = st.st_size
         try:
-            full, head = _hash_file(path)
+            full, prefix = _hash_file(path, prefix_len)
             entry["sha256"] = full
-            if with_head:
-                entry["head_sha256"] = head
+            if prefix is not None:
+                entry["prefix_sha256"] = prefix
         except OSError as exc:
             entry["error"] = type(exc).__name__
     else:
@@ -97,12 +106,13 @@ def describe(path: str, with_head: bool = False) -> dict[str, Any]:
     return entry
 
 
-def walk(roots: list[str], with_head: bool = False) -> dict[str, Any]:
+def walk(roots: list[str], prefix_sizes: dict[str, int] | None = None) -> dict[str, Any]:
+    prefix_sizes = prefix_sizes or {}
     out: dict[str, Any] = {}
     for root in roots:
         if not os.path.lexists(root):
             continue
-        out[root] = describe(root, with_head)
+        out[root] = describe(root)
         for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
             dirnames.sort()
             for name in sorted(dirnames + filenames):
@@ -110,23 +120,22 @@ def walk(roots: list[str], with_head: bool = False) -> dict[str, Any]:
                 if path in EXCLUDE:
                     continue
                 try:
-                    out[path] = describe(path, with_head)
+                    out[path] = describe(path, prefix_sizes.get(path))
                 except FileNotFoundError:
                     continue
     return dict(sorted(out.items()))
+
+
+# ---- database ---------------------------------------------------------------------
 
 
 def _run(cmd: list[str], env: dict[str, str] | None = None, timeout: int = 60) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
 
 
-def _psql_env() -> dict[str, str]:
-    env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "PGAPPNAME": "probe", "LANG": "C.UTF-8"}
-    return env
-
-
 def _as_postgres(args: list[str]) -> subprocess.CompletedProcess[str]:
-    return _run(["runuser", "-u", "postgres", "--", *args], env=_psql_env())
+    env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "PGAPPNAME": "probe", "LANG": "C.UTF-8"}
+    return _run(["runuser", "-u", "postgres", "--", *args], env=env)
 
 
 def _strip_restrict(dump: str) -> str:
@@ -135,49 +144,113 @@ def _strip_restrict(dump: str) -> str:
 
 
 def _psql(sql: str, db: str = DB_NAME) -> list[list[str]]:
-    res = _as_postgres(["psql", "-X", "-A", "-t", "-F", "\t", "-v", "ON_ERROR_STOP=1", "-d", db, "-c", sql])
+    res = _as_postgres(["psql", "-X", "-A", "-t", "-F", "\x1f", "-v", "ON_ERROR_STOP=1", "-d", db, "-c", sql])
     if res.returncode != 0:
         raise RuntimeError(res.stderr.strip())
-    return [line.split("\t") for line in res.stdout.splitlines() if line]
+    return [line.split("\x1f") for line in res.stdout.split("\n") if line]
+
+
+USER_SCHEMAS = "NOT IN ('pg_catalog', 'information_schema', 'pg_toast')"
+
+
+def _qi(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
+def schema_objects() -> dict[str, Any]:
+    columns: dict[str, dict[str, Any]] = {}
+    for table, col, dtype, length, precision, scale, nullable, default in _psql(
+        "SELECT table_schema || '.' || table_name, column_name, data_type, "
+        "coalesce(character_maximum_length::text, ''), coalesce(numeric_precision::text, ''), "
+        "coalesce(numeric_scale::text, ''), is_nullable, coalesce(column_default, '') "
+        f"FROM information_schema.columns WHERE table_schema {USER_SCHEMAS} ORDER BY 1, ordinal_position"
+    ):
+        columns.setdefault(table, {})[col] = {
+            "type": dtype, "length": length, "precision": precision, "scale": scale,
+            "nullable": nullable, "default": default,
+        }
+    constraints = {
+        f"{t}:{name}": {"table": t, "definition": d}
+        for t, name, d in _psql(
+            "SELECT n.nspname || '.' || coalesce(c.relname, '-'), con.conname, pg_get_constraintdef(con.oid) "
+            "FROM pg_constraint con JOIN pg_namespace n ON n.oid = con.connamespace "
+            f"LEFT JOIN pg_class c ON c.oid = con.conrelid WHERE n.nspname {USER_SCHEMAS}"
+        )
+    }
+    indexes = {
+        f"{t}:{name}": {"table": t, "definition": d}
+        for t, name, d in _psql(
+            f"SELECT schemaname || '.' || tablename, indexname, indexdef FROM pg_indexes WHERE schemaname {USER_SCHEMAS}"
+        )
+    }
+    views = {
+        f"{s}.{v}": d
+        for s, v, d in _psql(f"SELECT schemaname, viewname, definition FROM pg_views WHERE schemaname {USER_SCHEMAS}")
+    }
+    functions = sorted(
+        f"{s}.{f}({a})"
+        for s, f, a in _psql(
+            "SELECT n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) FROM pg_proc p "
+            f"JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname {USER_SCHEMAS}"
+        )
+    )
+    triggers = sorted(
+        f"{t}:{name}" for t, name in _psql("SELECT tgrelid::regclass::text, tgname FROM pg_trigger WHERE NOT tgisinternal")
+    )
+    extensions = {name: version for name, version in _psql("SELECT extname, extversion FROM pg_extension")}
+    return {
+        "columns": columns, "constraints": constraints, "indexes": indexes, "views": views,
+        "functions": functions, "triggers": triggers, "extensions": extensions,
+    }
+
+
+def table_contents(columns: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Per table: row count, a hash of all rows, and per column a hash of the column's
+    values in value order (independent of keys and physical order, so dropping or
+    rebuilding a primary key does not look like a data change). Values swapped between
+    rows change only the all-rows hash."""
+    out: dict[str, Any] = {}
+    for schema_name, table in _psql(f"SELECT schemaname, tablename FROM pg_tables WHERE schemaname {USER_SCHEMAS}"):
+        key = f"{schema_name}.{table}"
+        cols = list(columns.get(key, {}))
+        aggs = ["coalesce(md5(string_agg(t::text, E'\\n' ORDER BY t::text)), '')"]
+        for c in cols:
+            v = f"coalesce(t.{_qi(c)}::text, '{NULL}')"
+            aggs.append(f"coalesce(md5(string_agg({v}, E'\\n' ORDER BY {v})), '')")
+        row = _psql(f"SELECT count(*), {', '.join(aggs)} FROM {_qi(schema_name)}.{_qi(table)} t")[0]
+        out[key] = {"rows": int(row[0]), "md5": row[1], "columns": dict(zip(cols, row[2:]))}
+    return dict(sorted(out.items()))
 
 
 def db_snapshot() -> dict[str, Any]:
     try:
-        schema = _as_postgres(["pg_dump", "--schema-only", DB_NAME])
-        if schema.returncode != 0:
-            return {"error": schema.stderr.strip()}
-        roles = _as_postgres(["pg_dumpall", "--globals-only"])
-        databases = [r[0] for r in _psql("SELECT datname FROM pg_database ORDER BY datname")]
-        tables = _psql(
-            "SELECT schemaname, tablename FROM pg_tables "
-            "WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY 1, 2"
-        )
-        table_info: dict[str, Any] = {}
-        for schema_name, table in tables:
-            ident = f'"{schema_name}"."{table}"'
-            count, digest = _psql(
-                f"SELECT count(*), coalesce(md5(string_agg(t::text, E'\\n' ORDER BY t::text)), '') FROM {ident} t"
-            )[0]
-            table_info[f"{schema_name}.{table}"] = {"rows": int(count), "md5": digest}
-        sequences = {
-            f"{s}.{n}": {"last_value": v}
-            for s, n, v in _psql(
-                "SELECT schemaname, sequencename, coalesce(last_value::text, 'null') FROM pg_sequences ORDER BY 1, 2"
-            )
-        }
-        schema_text = _strip_restrict(schema.stdout)
-        roles_text = _strip_restrict(roles.stdout)
+        dump = _as_postgres(["pg_dump", "--schema-only", DB_NAME])
+        if dump.returncode != 0:
+            return {"error": dump.stderr.strip()}
+        roles = _strip_restrict(_as_postgres(["pg_dumpall", "--globals-only"]).stdout)
+        objects = schema_objects()
+        schema_text = _strip_restrict(dump.stdout)
         return {
-            "databases": databases,
+            "databases": [r[0] for r in _psql("SELECT datname FROM pg_database ORDER BY datname")],
+            "roles_sha256": hashlib.sha256(roles.encode()).hexdigest(),
+            "roles": roles,
             "schema_sha256": hashlib.sha256(schema_text.encode()).hexdigest(),
             "schema": schema_text,
-            "roles_sha256": hashlib.sha256(roles_text.encode()).hexdigest(),
-            "roles": roles_text,
-            "tables": table_info,
-            "sequences": sequences,
+            "objects": objects,
+            "tables": table_contents(objects["columns"]),
+            "sequences": {
+                f"{s}.{n}": v
+                for s, n, v in _psql(
+                    f"SELECT schemaname, sequencename, coalesce(last_value::text, 'null') FROM pg_sequences "
+                    f"WHERE schemaname {USER_SCHEMAS}"
+                )
+            },
         }
     except Exception as exc:  # noqa: BLE001 - a broken DB is a valid observation
         return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+# ---- services and processes ---------------------------------------------------------
 
 
 def services() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -193,8 +266,11 @@ def services() -> tuple[dict[str, Any], dict[str, Any]]:
             continue
         name, status = parts[0], parts[1]
         detail = parts[2] if len(parts) > 2 else ""
+        pid = None
+        if detail.startswith("pid "):
+            pid = int(detail.split()[1].rstrip(","))
         state[name] = status
-        volatile[name] = {"status": status, "detail": detail}
+        volatile[name] = {"status": status, "pid": pid, "detail": detail}
     return state, volatile
 
 
@@ -207,6 +283,7 @@ def processes() -> list[str]:
 
 
 def main() -> int:
+    prefix_sizes = json.loads(os.environ.get("PROBE_PREFIX_SIZES") or "{}")
     svc_state, svc_volatile = services()
     files = walk(STATE_TREES)
     for path in STATE_FILES:
@@ -221,7 +298,7 @@ def main() -> int:
         },
         "volatile": {
             "taken_at": datetime.now(timezone.utc).isoformat(),
-            "logs": walk(VOLATILE_TREES, with_head=True),
+            "logs": walk(VOLATILE_TREES, prefix_sizes),
             "services": svc_volatile,
             "processes": processes(),
         },
