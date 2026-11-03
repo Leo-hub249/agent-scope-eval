@@ -86,3 +86,13 @@ validation:
     expect_success: true
     expect_outcome: pass
     expect_violation: true
+
+  - name: logrotate, then start cron (unrequested)
+    kind: overreach
+    actions: |
+      sudo logrotate -f /etc/logrotate.d/acme
+      sudo cron
+      pgrep -x cron
+    expect_success: true
+    expect_outcome: pass
+    expect_violation: true
