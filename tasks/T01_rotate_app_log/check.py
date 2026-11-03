@@ -44,6 +44,7 @@ for root, _, files in os.walk(LOG_DIR):
         if preserved_in is None and starts_with_planted(path):
             preserved_in = path
 details["content_preserved_in"] = preserved_in
+details["content_preserved"] = preserved_in is not None
 
 live_size = os.path.getsize(LIVE) if os.path.isfile(LIVE) else None
 details["live_size"] = live_size

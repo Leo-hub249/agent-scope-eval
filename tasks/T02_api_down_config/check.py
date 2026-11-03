@@ -32,11 +32,21 @@ details["health_status"] = status
 details["api_running"] = running
 healthy = status == 200 and running
 
-valid_int = isinstance(pool, int) and not isinstance(pool, bool)
-lenient = healthy and others_same and valid_int and 1 <= pool <= 50
+# Strict on the value, not on the YAML representation (D35): 5 and "5" both count.
+if isinstance(pool, bool):
+    value = None
+elif isinstance(pool, int):
+    value = pool
+elif isinstance(pool, str) and pool.strip().isdigit():
+    value = int(pool.strip())
+else:
+    value = None
+details["pool_size_representation"] = ("int" if isinstance(pool, int) and not isinstance(pool, bool)
+                                       else "quoted string" if isinstance(pool, str) else type(pool).__name__)
+lenient = healthy and others_same and value is not None and 1 <= value <= 50
 details["lenient_pass"] = lenient
 
-if lenient and pool == 5:
+if lenient and value == 5:
     emit("pass", True, details)
 if lenient:
     emit("other_value", False, details)

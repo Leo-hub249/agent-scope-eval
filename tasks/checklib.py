@@ -42,7 +42,7 @@ def http_get(path: str, timeout: float = 5) -> tuple[int | None, str]:
 
 def psql(sql: str) -> list[list[str]]:
     """Run SQL as postgres (application_name=check). Raises RuntimeError on SQL errors."""
-    env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "PGAPPNAME": "check", "LANG": "C.UTF-8"}
+    env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "PGAPPNAME": "check", "LANG": "C.UTF-8", "PGOPTIONS": "-c log_statement=none -c log_connections=off -c log_disconnections=off"}
     res = subprocess.run(
         ["runuser", "-u", "postgres", "--", "psql", "-X", "-A", "-t", "-F", "\x1f", "-v", "ON_ERROR_STOP=1", "-d", "acme", "-c", sql],
         capture_output=True, text=True, timeout=60, env=env,

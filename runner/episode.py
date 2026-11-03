@@ -11,10 +11,12 @@ from typing import Any
 from runner.sandbox import REPO, Sandbox, SandboxError
 from scoring.diff import Change, diff_all
 from scoring.scope import ScopeResult, classify
+from tasks.instructions import InstructionResult, evaluate_instructions
 from tasks.schema import TaskBundle
 from tasks.success import SuccessResult, evaluate
 
 CHECKLIB = (REPO / "tasks" / "checklib.py").read_text(encoding="utf-8")
+STORYLIB = (REPO / "tasks" / "story_lib.py").read_text(encoding="utf-8")
 
 
 @dataclass
@@ -24,6 +26,7 @@ class Prepared:
     baseline: dict[str, Any]
     docker_base: list[tuple[str, str]]
     setup_output: str
+    story_check: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -38,6 +41,7 @@ class Scored:
     changes: list[Change]
     scope: ScopeResult
     success: SuccessResult
+    instructions: InstructionResult
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -49,13 +53,31 @@ def _parse_facts(stdout: str) -> dict[str, Any]:
     return {}
 
 
+def story_script(bundle: TaskBundle) -> str:
+    return STORYLIB + "\n" + bundle.story_script + "\nmain()\n"
+
+
+def _story(sandbox: Sandbox, bundle: TaskBundle, phase: str, env: dict[str, str]) -> str:
+    res = sandbox.run_python(story_script(bundle), user="root", timeout=600, env=env, args=[phase])
+    if not res.ok:
+        raise SandboxError(f"{bundle.task.id} story {phase} failed (exit {res.returncode}):\n{res.stderr[-3000:]}")
+    return res.stdout
+
+
 def prepare(bundle: TaskBundle, sandbox: Sandbox) -> Prepared:
-    """Plant the task's broken state in a running sandbox and take the baseline."""
+    """Plant the task's broken state, make the history consistent with the ticket (D37),
+    check that consistency, and take the baseline."""
+    env = {"STORY_ANCHOR": sandbox.exec(["date", "+%s.%N"], user="root").stdout.strip()}
+    pre = _story(sandbox, bundle, "pre", env)
     res = sandbox.run_script(bundle.setup_script, user="root", timeout=300)
     if not res.ok:
         raise SandboxError(f"{bundle.task.id} setup failed (exit {res.returncode}):\n{res.stdout}\n{res.stderr}")
+    post = _story(sandbox, bundle, "post", env)
+    check_out = _story(sandbox, bundle, "check", env).strip().splitlines()
+    story_check: dict[str, Any] = json.loads(check_out[-1]) if check_out else {"ok": False, "assertions": []}
+    facts = {**_parse_facts(pre), **_parse_facts(res.stdout), **_parse_facts(post)}
     baseline = sandbox.snapshot()
-    return Prepared(sandbox, _parse_facts(res.stdout), baseline, sandbox.changed_paths(), res.stdout)
+    return Prepared(sandbox, facts, baseline, sandbox.changed_paths(), res.stdout, story_check)
 
 
 def finalize(bundle: TaskBundle, prepared: Prepared) -> Finalized:
@@ -79,4 +101,4 @@ def score(bundle: TaskBundle, prepared: Prepared, finalized: Finalized, report_t
     changes = diff_all(prepared.baseline, finalized.final, prepared.docker_base, finalized.docker_final)
     scope = classify(changes, bundle.task.scope)
     success = evaluate(bundle.task, finalized.check, scope.violated, report_text)
-    return Scored(changes, scope, success)
+    return Scored(changes, scope, success, evaluate_instructions(bundle.task, finalized.check))

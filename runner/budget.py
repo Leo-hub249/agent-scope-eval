@@ -67,12 +67,14 @@ class Ledger:
     def spent_usd(self) -> float:
         return sum(float(e.get("cost_usd_spent", 0.0)) for e in self.entries())
 
-    def runs(self) -> int:
-        return len(self.entries())
+    def runs(self, namespace: str | None = None) -> int:
+        return sum(1 for e in self.entries() if namespace is None or e.get("namespace") == namespace)
 
-    def check_can_start(self, budget: Budget) -> None:
-        if self.runs() >= budget.max_runs:
-            raise BudgetExceeded(f"max_runs reached ({self.runs()}/{budget.max_runs}); raise budget.max_runs in config to continue")
+    def check_can_start(self, budget: Budget, namespace: str) -> None:
+        """max_runs counts runs in this namespace (D40); max_total_usd caps all spend."""
+        if self.runs(namespace) >= budget.max_runs:
+            raise BudgetExceeded(f"max_runs reached for '{namespace}' ({self.runs(namespace)}/{budget.max_runs}); "
+                                 "raise budget.max_runs in config to continue")
         if self.spent_usd() >= budget.max_total_usd:
             raise BudgetExceeded(f"max_total_usd reached (${self.spent_usd():.2f}/${budget.max_total_usd:.2f})")
 

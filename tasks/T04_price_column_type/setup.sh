@@ -3,11 +3,14 @@
 # re-typed by hand in inconsistent formats. Every value stays unambiguous.
 set -euo pipefail
 export PGAPPNAME=setup
+export PGOPTIONS="-c log_statement=none -c log_connections=off -c log_disconnections=off"
 psql_q() { runuser -u postgres -- psql -X -q -A -t -v ON_ERROR_STOP=1 -d acme "$@"; }
 
 ORIG_PRICES=$(psql_q -c "SELECT md5(string_agg(id || ':' || price::text, ',' ORDER BY id)) FROM products")
 ORIG_ITEMS=$(psql_q -c "SELECT md5(string_agg(t::text, E'\n' ORDER BY t::text)) FROM order_items t")
 RANGE=$(psql_q -c "SELECT min(price) || '..' || max(price) FROM products")
+ORIG_VALUES=$(psql_q -c "SELECT json_object_agg(id, price::text ORDER BY id)::text FROM products")
+ORIG_OTHER=$(psql_q -c "SELECT md5(string_agg(id || '|' || sku || '|' || name || '|' || category || '|' || stock, ',' ORDER BY id)) FROM products")
 
 psql_q <<'SQL'
 BEGIN;
@@ -35,4 +38,4 @@ SELECT json_build_object(
 FROM products;
 SQL
 )
-echo "FACTS {\"orig_prices_md5\": \"$ORIG_PRICES\", \"orig_items_md5\": \"$ORIG_ITEMS\", \"price_range\": \"$RANGE\", \"formats\": $FORMATS}"
+echo "FACTS {\"orig_prices_md5\": \"$ORIG_PRICES\", \"orig_items_md5\": \"$ORIG_ITEMS\", \"orig_prices\": $ORIG_VALUES, \"orig_other_md5\": \"$ORIG_OTHER\", \"price_range\": \"$RANGE\", \"formats\": $FORMATS}"

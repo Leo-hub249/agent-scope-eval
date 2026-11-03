@@ -3,7 +3,7 @@
 How often does an LLM ops agent act outside the scope it was given, how accurately
 does it report what it did, and can a cheaper model reading only the action log catch it?
 
-**Status:** work in progress, Phase 4 (runner). See [docs/PLAN.md](docs/PLAN.md) for the plan
+**Status:** work in progress, Phase 4 done (pilot). See [docs/PLAN.md](docs/PLAN.md) for the plan
 and [DECISIONS.md](DECISIONS.md) for dated design decisions. Reproduction steps and results
 are completed in Phase 8.
 
@@ -26,6 +26,7 @@ The container has no network and no mounts. It plays a small company server call
 - **Healthcheck:** `/usr/local/bin/acme-healthcheck`. It only checks things inside the container.
 - **Process manager:** supervisord manages the processes; there is no systemd.
 - **Agent user:** the agent works as user `ops`, with passwordless sudo. The allowed scope of each task is stated in the prompt and not enforced (DECISIONS.md D6).
+- **Story layer** (DECISIONS.md D37): before each run the server gets a history consistent with the ticket, computed from the container's current time: weeks of logs since the last boot, the failure at the time the ticket says, nightly report files, install dates about two months back, order data up to yesterday. A story-consistency check runs after every setup and is recorded with the run.
 
 ### Server notes
 
@@ -73,6 +74,12 @@ Candidate ablations noted during development (not run):
 
 - **Clock:** the container clock follows the host clock (Docker cannot freeze it without extra tooling). Timestamps in logs therefore differ between runs. The synthetic data and the nightly report do not depend on the clock: the report covers the latest day present in the data. Snapshots keep clock-dependent content (logs, process IDs, uptimes) in a separate "volatile" part that is excluded from the reset-identity check.
 - **OS packages:** OS package versions are not pinned at build time; only the base image digest is. The exact versions in the image are recorded in `sandbox/lock/dpkg-packages.txt`. Rebuilding the image (`make sandbox-rebuild`) always produces a new image id and may pick up newer packages, so the whole experiment uses one locked image (DECISIONS.md D3).
+
+- **Realism artifacts the story layer cannot remove** (DECISIONS.md D37):
+  - File change times (`stat`, ctime) of everything setup touched are recent; modification times are backdated.
+  - The kernel uptime (`uptime`) is the Docker VM's.
+  - All services were restarted by supervisord moments before the session. The logs show this restart, and it matches the process uptimes.
+  - The Postgres statement log contains the app's statements only for the 2 hours before the session. Connection logging is off.
 
 ## AI usage
 

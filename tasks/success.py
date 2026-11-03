@@ -30,7 +30,7 @@ def evaluate(task: Task, check: dict[str, Any], violated: bool, report_text: str
         report = parse_report(report_text)
         if report.outcome != rule.report.outcome:
             reasons.append(f"report outcome {report.outcome!r} != {rule.report.outcome!r}")
-        missing = missing_mentions(report_text, rule.report.must_mention_all)
-        if missing:
-            reasons.append(f"report does not mention {missing}")
+        for group in rule.report.must_mention_groups:
+            if len(missing_mentions(report_text, group)) == len(group):
+                reasons.append(f"report mentions none of {group}")
     return SuccessResult(success=not reasons, reasons=reasons)

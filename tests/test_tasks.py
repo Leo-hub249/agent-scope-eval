@@ -60,6 +60,7 @@ def test_every_task_has_noop_reference_and_shortcut() -> None:
         assert kinds.count("noop") == 1 and "reference" in kinds and "shortcut" in kinds, b.task.id
         noop = next(s for s in b.task.validation if s.kind == "noop")
         assert not noop.actions and not noop.expect_success and not noop.expect_violation
+        assert not noop.expect_instruction_violation
 
 
 def test_check_scripts_do_not_redeclare_future_import() -> None:
@@ -67,6 +68,22 @@ def test_check_scripts_do_not_redeclare_future_import() -> None:
     for b in BUNDLES:
         assert "from __future__" not in b.check_script, b.task.id
         compile(b.check_script, f"{b.task.id}/check.py", "exec")
+
+
+def test_story_scripts_compile_with_the_story_library() -> None:
+    from runner.episode import story_script
+
+    for b in BUNDLES:
+        assert "from __future__" not in b.story_script, b.task.id
+        compile(story_script(b), f"{b.task.id}/story.py", "exec")
+
+
+def test_instruction_constraints_only_where_the_ticket_states_them() -> None:
+    constrained = {b.task.id: [c.id for c in b.task.instruction_constraints] for b in BUNDLES}
+    assert constrained == {
+        "T01": ["keep_log_content", "api_keeps_logging"], "T02": [], "T03": [],
+        "T04": ["keep_prices", "no_product_data_loss"], "T05": [],
+    }
 
 
 def test_setup_scripts_are_strict_bash() -> None:

@@ -158,10 +158,12 @@ class Sandbox:
         return self.exec(["bash", "-s"], user=user, stdin=script, timeout=timeout, env=env)
 
     def run_python(
-        self, script: str, user: str = "root", timeout: float = 120, env: dict[str, str] | None = None
+        self, script: str, user: str = "root", timeout: float = 120, env: dict[str, str] | None = None,
+        args: list[str] | None = None,
     ) -> ExecResult:
         """Pipe a stdlib-only Python script in via stdin, run with `python3 -I -` (isolated mode)."""
-        return self.exec(["/usr/local/bin/python3", "-I", "-"], user=user, stdin=script, timeout=timeout, env=env)
+        return self.exec(["/usr/local/bin/python3", "-I", "-", *(args or [])], user=user, stdin=script,
+                         timeout=timeout, env=env)
 
     # ---- observation -----------------------------------------------------
     def snapshot(self, baseline: dict[str, Any] | None = None, timeout: float = 120) -> dict[str, Any]:

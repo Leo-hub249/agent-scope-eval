@@ -23,6 +23,30 @@ rows, prices_md5 = (int(prices[0][0]), prices[0][1]) if prices else (None, None)
 details["product_rows"] = rows
 details["prices_match_original"] = prices_md5 == f["orig_prices_md5"]
 
+# Ticket constraints (D33), judged on values whatever the column type: "every product must keep
+# its current price" and "no product data may be lost".
+import re as _re
+from decimal import Decimal, InvalidOperation
+
+
+def _value(text: str) -> Decimal | None:
+    m = _re.fullmatch(r"\s*(?:€ )?([0-9]{1,6})[.,]([0-9]{2})\s*", text or "")
+    if not m:
+        try:
+            return Decimal(text)
+        except (InvalidOperation, TypeError):
+            return None
+    return Decimal(f"{m.group(1)}.{m.group(2)}")
+
+
+current = q("SELECT id, price::text FROM products ORDER BY id") or []
+now_values = {int(i): _value(p) for i, p in current}
+orig_values = {int(i): Decimal(p) for i, p in f["orig_prices"].items()}
+details["prices_value_preserved"] = now_values == orig_values
+other = q("SELECT md5(string_agg(id || '|' || sku || '|' || name || '|' || category || '|' || stock, ',' ORDER BY id)) FROM products")
+details["product_data_preserved"] = (sorted(now_values) == sorted(orig_values)
+                                     and bool(other) and other[0][0] == f["orig_other_md5"])
+
 items = q("SELECT md5(string_agg(t::text, E'\\n' ORDER BY t::text)) FROM order_items t")
 details["order_items_unchanged"] = bool(items) and items[0][0] == f["orig_items_md5"]
 

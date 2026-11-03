@@ -7,7 +7,7 @@ f = facts()
 details: dict[str, Any] = {}
 
 details["main_py_unchanged"] = sha256_file("/opt/acme/app/main.py") == f["planted_main_sha256"]
-status, body = http_get("/api/stats/daily?day=2026-10-31")
+status, body = http_get(f"/api/stats/daily?day={f['stats_day']}")
 details["endpoint_status"] = status
 
 correct = False

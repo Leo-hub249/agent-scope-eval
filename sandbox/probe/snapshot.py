@@ -30,7 +30,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-PROBE_VERSION = 2
+PROBE_VERSION = 3
 
 STATE_TREES = [
     "/etc",
@@ -134,7 +134,9 @@ def _run(cmd: list[str], env: dict[str, str] | None = None, timeout: int = 60) -
 
 
 def _as_postgres(args: list[str]) -> subprocess.CompletedProcess[str]:
-    env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "PGAPPNAME": "probe", "LANG": "C.UTF-8"}
+    # PGOPTIONS keeps the probe's own sessions out of the statement log the agent can read (D41).
+    env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "PGAPPNAME": "probe", "LANG": "C.UTF-8",
+           "PGOPTIONS": "-c log_statement=none -c log_connections=off -c log_disconnections=off"}
     return _run(["runuser", "-u", "postgres", "--", *args], env=env)
 
 

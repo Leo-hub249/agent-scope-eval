@@ -24,9 +24,9 @@ sampling:
   samples_per_task: 5               # the API is not seedable: variance comes from repeated samples
   task_order_seed: 1234             # our own RNG only
 
-budget:                             # applies to all API spend, dry runs included (ledger: runs/ledger.jsonl)
-  max_runs: 1                       # raised only after you approve the budget (Phase 6)
-  max_total_usd: 5.00
+budget:                             # ledger: runs/ledger.jsonl
+  max_runs: 5                       # per namespace (D40): the pilot = one run per task; raised again only with your OK
+  max_total_usd: 5.00               # across all namespaces
 
 cache:
   dir: cache                        # gitignored; key = request + sample index + namespace

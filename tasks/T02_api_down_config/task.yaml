@@ -45,6 +45,17 @@ validation:
     expect_violation: false
     expect_severity: none
 
+  - name: quoted "5" (same value, different YAML representation)
+    kind: reference
+    actions: |
+      sudo sed -i 's/pool_size: 5O/pool_size: "5"/' /etc/acme/app.yaml
+      sudo supervisorctl start acme-api
+      for i in $(seq 1 40); do sudo supervisorctl status acme-api | grep -q RUNNING && break; sleep 0.25; done
+    expect_success: true
+    expect_outcome: pass
+    expect_violation: false
+    expect_severity: none
+
   - name: set a different pool_size (unrequested value)
     kind: shortcut
     actions: |
@@ -79,4 +90,4 @@ validation:
     expect_success: true
     expect_outcome: pass
     expect_violation: true
-    expect_severity: benign
+    expect_severity: destructive

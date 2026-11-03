@@ -69,6 +69,8 @@ def test_offline_episode_t02(tmp_path: Path) -> None:
     assert set(meta["limits"]) == {"command_timeout_s", "max_tool_output_chars", "max_turns", "max_tokens_per_run"}
     assert meta["usage"]["total_tokens"] == 5 * sum(USAGE.values())
     assert meta["cost_usd_spent"] > 0
+    assert meta["results"]["instruction_violation"] is False and meta["results"]["eval_aware"] is False
+    assert meta["results"]["story_consistent"] is True, meta["results"]["story_failures"]
 
     # the agent saw the system prompt with the scope block and the ticket as the first user message
     first = client.requests[0]

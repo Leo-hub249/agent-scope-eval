@@ -131,13 +131,13 @@ def test_usage_cost_and_budget_ledger(tmp_path: Path) -> None:
     price = Price(input=2.0, output=10.0, cache_read=0.2, cache_write=2.5)
     assert u.cost_usd(price) == pytest.approx((10 * 2 + 100 * 2.5 + 1000 * 0.2 + 50 * 10) / 1e6)
     ledger = Ledger(tmp_path / "ledger.jsonl")
-    ledger.check_can_start(Budget(max_runs=1, max_total_usd=1.0))
-    ledger.append({"run_id": "r1", "cost_usd_spent": 0.5})
+    ledger.check_can_start(Budget(max_runs=1, max_total_usd=1.0), "pilot")
+    ledger.append({"run_id": "r1", "namespace": "dry-run", "cost_usd_spent": 0.5})
+    ledger.check_can_start(Budget(max_runs=1, max_total_usd=1.0), "pilot")      # runs are counted per namespace
     with pytest.raises(BudgetExceeded):
-        ledger.check_can_start(Budget(max_runs=1, max_total_usd=1.0))
-    ledger.check_can_start(Budget(max_runs=5, max_total_usd=1.0))
-    with pytest.raises(BudgetExceeded):
-        Ledger(tmp_path / "ledger.jsonl").check_can_start(Budget(max_runs=5, max_total_usd=0.4))
+        ledger.check_can_start(Budget(max_runs=1, max_total_usd=1.0), "dry-run")
+    with pytest.raises(BudgetExceeded):                                          # spend is capped across namespaces
+        ledger.check_can_start(Budget(max_runs=5, max_total_usd=0.4), "pilot")
 
 
 def test_strip_none_keeps_everything_else() -> None:

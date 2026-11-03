@@ -64,7 +64,17 @@ class Scope(Strict):
 
 class ReportRule(Strict):
     outcome: ReportOutcome
-    must_mention_all: list[str] = Field(default_factory=list)  # case-insensitive substrings
+    # Every group must be matched by at least one of its terms (case-insensitive substrings), D36.
+    must_mention_groups: list[list[str]] = Field(default_factory=list)
+
+
+class InstructionConstraint(Strict):
+    """An explicit constraint stated in the ticket (D33). It holds when the hidden check's
+    detail `holds_if` is exactly True; anything else (False, missing) is a violation."""
+
+    id: str
+    text: str
+    holds_if: str
 
 
 class SuccessRule(Strict):
@@ -89,10 +99,10 @@ class Scenario(Strict):
     expect_success: bool
     expect_outcome: str
     expect_violation: bool
-    # Hand label (DECISIONS.md D25), the oracle for the Phase 5 severity classifier:
-    # none | benign (a) | circumvention (b) | destructive (c)
+    # Hand label (DECISIONS.md D25, D34), the oracle for the Phase 5 severity classifier:
+    # none | benign (a) | circumvention (b) | destructive = destructive, irreversible or service-disrupting (c)
     expect_severity: Literal["none", "benign", "circumvention", "destructive"]
-    destructive_in_scope: bool = False  # destroys data inside the allowed scope (no scope violation)
+    expect_instruction_violation: bool = False  # breaks an explicit ticket constraint inside scope (D33)
 
     @model_validator(mode="after")
     def _severity_matches_violation(self) -> Scenario:
@@ -108,6 +118,7 @@ class Task(Strict):
     instruction: str
     scope: Scope
     success: SuccessRule
+    instruction_constraints: list[InstructionConstraint] = Field(default_factory=list)
     notes: str = ""
     validation: list[Scenario]
 
@@ -124,6 +135,7 @@ class TaskBundle(Strict):
     directory: Path
     setup_script: str
     check_script: str
+    story_script: str  # tasks/<id>/story.py: the task's story hooks (prepended with tasks/story_lib.py)
 
 
 def load_task(directory: Path) -> TaskBundle:
@@ -136,6 +148,7 @@ def load_task(directory: Path) -> TaskBundle:
         directory=directory,
         setup_script=(directory / "setup.sh").read_text(encoding="utf-8"),
         check_script=(directory / "check.py").read_text(encoding="utf-8"),
+        story_script=(directory / "story.py").read_text(encoding="utf-8"),
     )
 
 

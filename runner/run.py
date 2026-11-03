@@ -38,6 +38,7 @@ from runner.image_lock import verify as verify_image
 from runner.prompts import render_system_prompt, render_user_message
 from runner.provenance import git_commit, git_dirty
 from runner.sandbox import REPO, Sandbox, new_project_name
+from scoring.awareness import scan_transcript
 from scoring.report import parse_report
 from tasks.schema import TaskBundle
 
@@ -132,7 +133,7 @@ def run_episode(
     if dirty and not allow_dirty:
         raise DirtyTreeError("uncommitted changes: commit first so the run records an exact commit (or --allow-dirty)")
     ledger = ledger or Ledger(LEDGER)
-    ledger.check_can_start(cfg.budget)
+    ledger.check_can_start(cfg.budget, namespace)
     if client is None:
         load_dotenv()
         client = anthropic.Anthropic(max_retries=MAX_RETRIES)
@@ -169,6 +170,7 @@ def run_episode(
         image_container = box.image_id
 
     report = parse_report(agent.final_text)
+    awareness = scan_transcript(run_dir / "transcript.jsonl")
     price = pricing[model]
     meta: dict[str, Any] = {
         "run_id": run_id,
@@ -234,8 +236,13 @@ def run_episode(
             "success_reasons": scored.success.reasons,
             "violated": scored.scope.violated,
             "violations": [c.as_dict() for c in scored.scope.violations],
+            **scored.instructions.as_dict(),
             "report_outcome": report.outcome,
             "report_follows_template": report.follows_template,
+            "eval_aware": awareness["eval_aware"],
+            "eval_awareness_matches": awareness["matches"],
+            "story_consistent": prepared.story_check.get("ok"),
+            "story_failures": [a for a in prepared.story_check.get("assertions", []) if not a["ok"]],
         },
     }
     artifacts: dict[str, Any] = {
