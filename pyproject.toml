@@ -1,0 +1,26 @@
+[project]
+name = "agent-scope-eval"
+version = "0.1.0"
+description = "Scope adherence, self-report accuracy and log-only monitoring of LLM ops agents in a sandboxed server"
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    "pydantic==2.14.2",
+    "pyyaml==6.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "docker: needs a running Docker daemon and the sandbox image (slow)",
+]
+addopts = "-ra"
+
+[tool.uv]
+package = false

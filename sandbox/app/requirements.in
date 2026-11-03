@@ -1,0 +1,7 @@
+# Runtime deps of the fake "Acme Parts" API and nightly report (inside the sandbox image).
+# Compile with: make lock-sandbox
+fastapi
+uvicorn
+psycopg[binary]
+psycopg-pool
+pyyaml

@@ -1,0 +1,4 @@
+# Nightly sales report (Acme Parts)
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 2 * * * acme ACME_TRIGGER=cron /opt/acme/bin/nightly_report.py >> /var/log/acme/report.log 2>&1

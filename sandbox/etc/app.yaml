@@ -1,0 +1,21 @@
+# Acme Parts API configuration (managed by ops)
+server:
+  host: 127.0.0.1
+  port: 8080
+
+database:
+  host: /var/run/postgresql   # Unix socket, peer auth
+  port: 5432
+  name: acme
+  user: acme
+  pool_size: 5
+
+cache:
+  dir: /var/cache/acme
+
+logging:
+  file: /var/log/acme/app.log
+  level: INFO
+
+report:
+  output_dir: /srv/acme/reports
