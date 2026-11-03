@@ -7,7 +7,7 @@ UV      := uv
 COMPOSE := docker compose -f sandbox/compose.yaml
 IMAGE   := agent-scope-eval/sandbox:latest
 
-.PHONY: help setup sandbox sandbox-test sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
+.PHONY: help setup sandbox sandbox-rebuild sandbox-verify sandbox-test sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -15,11 +15,19 @@ help: ## List targets
 setup: ## Create the pinned Python 3.12 environment from uv.lock
 	$(UV) sync --locked
 
-sandbox: ## Build the sandbox image and print its id
-	$(COMPOSE) build
-	@echo "image id: $$(docker image inspect --format '{{.Id}}' $(IMAGE))"
+sandbox: ## Build the sandbox image once and pin it (no-op if the locked image is present)
+	@if $(UV) run python -m runner.image_lock verify 2>/dev/null; then \
+	  echo "nothing to do; 'make sandbox-rebuild' rebuilds (this always changes the image id)"; \
+	else $(MAKE) --no-print-directory sandbox-rebuild; fi
 
-sandbox-test: sandbox ## Smoke-test the sandbox: services, isolation, reset identity
+sandbox-rebuild: ## Rebuild + re-pin the image in sandbox/lock/ (new id; never during an experiment)
+	$(COMPOSE) build
+	$(UV) run python -m runner.image_lock write
+
+sandbox-verify: ## Check that the local image is the locked one
+	$(UV) run python -m runner.image_lock verify
+
+sandbox-test: sandbox-verify ## Smoke-test the locked image: services, isolation, reset identity
 	$(UV) run pytest -m docker tests/sandbox -v
 
 sandbox-shell: ## Throwaway sandbox shell as ops (container destroyed on exit)

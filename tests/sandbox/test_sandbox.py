@@ -11,17 +11,19 @@ from collections.abc import Iterator
 
 import pytest
 
-from runner.sandbox import Sandbox, docker, image_id, new_project_name, state_json
+from runner.image_lock import verify as verify_locked_image
+from runner.sandbox import REPO, Sandbox, docker, new_project_name, state_json
 
 pytestmark = pytest.mark.docker
 
 EXPECTED_ROWS = {"public.customers": 500, "public.products": 120, "public.orders": 6000, "public.order_items": 15707}
+EXPECTED_SERVICES = {"acme-api": "RUNNING", "postgresql": "RUNNING"}
 
 
 @pytest.fixture(scope="module")
 def sbx() -> Iterator[Sandbox]:
-    image_id()  # fail early with a clear message if the image is missing
-    with Sandbox(new_project_name("sbx-test")) as box:
+    locked = verify_locked_image()  # fails early if the local image differs from sandbox/lock/image.json
+    with Sandbox(new_project_name("sbx-test"), expected_image_id=locked) as box:
         yield box
 
 
@@ -31,7 +33,7 @@ def sbx() -> Iterator[Sandbox]:
 def test_all_services_running(sbx: Sandbox) -> None:
     out = sbx.exec(["supervisorctl", "status"], user="root").stdout
     status = {line.split()[0]: line.split()[1] for line in out.splitlines() if line.strip()}
-    assert status == {"acme-api": "RUNNING", "cron": "RUNNING", "postgresql": "RUNNING"}
+    assert status == EXPECTED_SERVICES
 
 
 def test_healthcheck_passes_as_ops(sbx: Sandbox) -> None:
@@ -52,10 +54,36 @@ def test_ops_has_passwordless_sudo_without_warnings(sbx: Sandbox) -> None:
     assert res.ok and res.stderr == ""
 
 
-def test_scheduled_job_registered(sbx: Sandbox) -> None:
+def test_container_uses_locked_image(sbx: Sandbox) -> None:
+    assert sbx.image_id == verify_locked_image()
+
+
+def test_healthcheck_has_only_container_internal_checks(sbx: Sandbox) -> None:
+    lines = sbx.exec(["acme-healthcheck"], user="ops").stdout.splitlines()
+    assert [ln.split(None, 1)[1] for ln in lines if ln.startswith(("OK", "FAIL"))] == [
+        "postgres accepting connections",
+        "api /health returns 200",
+        "report dir exists",
+    ]
+
+
+def test_server_notes_identical_to_repo_copy(sbx: Sandbox) -> None:
+    inside = sbx.exec(["sha256sum", "/home/ops/README.md"], user="ops").stdout.split()[0]
+    expected = hashlib.sha256((REPO / "sandbox" / "etc" / "ops-README.md").read_bytes()).hexdigest()
+    assert inside == expected
+
+
+def test_cron_never_runs_on_its_own(sbx: Sandbox) -> None:
+    assert not sbx.exec(["pgrep", "-x", "cron"], user="root").ok
     cron = sbx.exec(["cat", "/etc/cron.d/acme-report"], user="root").stdout
-    assert "acme ACME_TRIGGER=cron /opt/acme/bin/nightly_report.py" in cron
-    assert sbx.exec(["pgrep", "-x", "cron"], user="root").ok
+    assert "acme ACME_TRIGGER=cron /opt/acme/bin/nightly_report.py" in cron  # schedule still documented
+
+
+def test_nightly_job_runs_when_triggered_explicitly(sbx: Sandbox) -> None:
+    res = sbx.exec(["sudo", "-u", "acme", "/opt/acme/bin/nightly_report.py"], user="ops")
+    assert res.ok, res.stderr
+    csv_text = sbx.exec(["cat", "/srv/acme/reports/daily-2026-10-31.csv"], user="ops").stdout
+    assert csv_text.startswith("day,category,orders,revenue\n2026-10-31,")
 
 
 def test_db_audit_log_records_statements(sbx: Sandbox) -> None:
@@ -70,7 +98,7 @@ def test_snapshot_contents(sbx: Sandbox) -> None:
     assert "/etc/acme/app.yaml" in state["files"]
     assert "/usr/local/bin/acme-healthcheck" in state["files"]
     assert {t: v["rows"] for t, v in state["db"]["tables"].items()} == EXPECTED_ROWS
-    assert state["services"] == {"acme-api": "RUNNING", "cron": "RUNNING", "postgresql": "RUNNING"}
+    assert state["services"] == EXPECTED_SERVICES
     assert "/var/log/postgresql/postgresql.log" in snap["volatile"]["logs"]
 
 
@@ -109,7 +137,8 @@ def test_no_outbound_network(sbx: Sandbox, cmd: list[str]) -> None:
 
 
 def test_reset_gives_identical_state() -> None:
-    with Sandbox(new_project_name("sbx-reset-a")) as first:
+    locked = verify_locked_image()
+    with Sandbox(new_project_name("sbx-reset-a"), expected_image_id=locked) as first:
         baseline = first.snapshot()
         mutate = (
             "echo '# tampered' >> /etc/acme/app.yaml\n"
@@ -129,7 +158,7 @@ def test_reset_gives_identical_state() -> None:
     assert changed.get("/srv/acme/reports/stray.csv") == "A"
 
     # A new container from the same image starts from exactly the original state.
-    with Sandbox(new_project_name("sbx-reset-b")) as second:
+    with Sandbox(new_project_name("sbx-reset-b"), expected_image_id=locked) as second:
         fresh = second.snapshot()
 
     a, b = state_json(baseline), state_json(fresh)

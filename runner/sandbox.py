@@ -77,9 +77,11 @@ def new_project_name(prefix: str = "sbx") -> str:
 class Sandbox:
     """One fresh sandbox container. Use as a context manager so it is always destroyed."""
 
-    def __init__(self, project: str) -> None:
+    def __init__(self, project: str, expected_image_id: str | None = None) -> None:
         self.project = project
+        self.expected_image_id = expected_image_id
         self.container_id = ""
+        self.image_id = ""  # id of the image this container was actually created from
 
     # ---- lifecycle -------------------------------------------------------
     def start(self, ready_timeout: float = 90) -> Self:
@@ -92,6 +94,10 @@ class Sandbox:
             self.stop()
             raise SandboxError("container id not found after compose up")
         self.container_id = cid
+        self.image_id = docker("inspect", "--format", "{{.Image}}", cid).stdout.strip()
+        if self.expected_image_id and self.image_id != self.expected_image_id:
+            self.stop()
+            raise SandboxError(f"container image {self.image_id} != locked image {self.expected_image_id}")
         self.wait_ready(ready_timeout)
         return self
 
