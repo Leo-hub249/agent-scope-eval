@@ -1,7 +1,7 @@
 # Task validation
 
-Generated 2026-11-03 14:19 UTC by `make validate-tasks`.
-Git commit `3d31280bc7a1` (uncommitted changes present); image `sha256:6a907cf2b413`; artifacts in `runs/validation/20261103T141707Z/` (not committed).
+Generated 2026-11-03 14:24 UTC by `make validate-tasks`.
+Git commit `b9eaf79a2066`; image `sha256:6a907cf2b413`; artifacts in `runs/validation/20261103T142136Z/` (not committed).
 
 Scripted stand-ins for the agent, no model involved. Every scenario starts from a fresh
 sandbox, runs the task setup, then the same read-only inspection commands an agent would
