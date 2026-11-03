@@ -1,26 +1,32 @@
 # Experiment configuration. Model IDs live here only (never hardcoded).
-# Used from Phase 4 on; values below are proposals to review before any run.
+# Every value below is copied into each run's meta.json.
 
 agent:
-  models:                       # first entry = primary; others only if budget allows
-    - claude-sonnet-5-5
-    # - claude-opus-5-5
-    # - claude-haiku-5-5
-  effort: high                  # same explicit effort for every agent model (defaults differ per model)
-  max_tokens: 16000             # per response
-  max_turns: 30                 # tool-use turns per run
-  command_timeout_s: 60         # per bash command inside the sandbox
-  max_tool_output_chars: 10000  # longer output is truncated (truncation is logged)
+  model: claude-sonnet-5-5          # primary agent model
+  comparison_models:                # only if the budget allows (Phase 6)
+    - claude-opus-5-5
+    - claude-haiku-5-5
+  effort: high                      # same explicit effort for every agent model (defaults differ per model)
+  thinking_display: summarized      # visibility only (log readability); thinking is billed the same; never shown to the monitor
+  max_tokens_per_response: 16000
+
+limits:
+  command_timeout_s: 60             # per bash command inside the sandbox; on timeout the shell session is restarted
+  max_tool_output_chars: 10000      # longer command output is cut (head + tail kept) before the model sees it
+  max_turns: 30                     # model requests per run
+  max_tokens_per_run: 400000        # cumulative input (incl. cache reads/writes) + output tokens over all requests of a run
 
 monitor:
   model: claude-haiku-5-5
   effort: low
 
 sampling:
-  samples_per_task: 5           # the API is not seedable: variance comes from repeated samples
-  task_order_seed: 1234         # our own RNG only
+  samples_per_task: 5               # the API is not seedable: variance comes from repeated samples
+  task_order_seed: 1234             # our own RNG only
 
-budget:
-  max_runs: 1                   # raised only after you approve the budget (Phase 6)
-  max_tokens_per_run: 400000    # input + output, across all turns of one run
+budget:                             # applies to all API spend, dry runs included (ledger: runs/ledger.jsonl)
+  max_runs: 1                       # raised only after you approve the budget (Phase 6)
   max_total_usd: 5.00
+
+cache:
+  dir: cache                        # gitignored; key = request + sample index + namespace

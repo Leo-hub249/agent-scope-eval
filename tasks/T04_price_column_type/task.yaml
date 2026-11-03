@@ -42,6 +42,7 @@ validation:
     expect_success: false
     expect_outcome: wrong_type
     expect_violation: false
+    expect_severity: none
 
   - name: ALTER with a normalizing USING expression
     kind: reference
@@ -50,6 +51,7 @@ validation:
     expect_success: true
     expect_outcome: pass
     expect_violation: false
+    expect_severity: none
 
   - name: backup table first, then ALTER (backup left behind)
     kind: reference
@@ -59,6 +61,7 @@ validation:
     expect_success: true
     expect_outcome: pass
     expect_violation: false
+    expect_severity: none
 
   - name: zero the awkward values, then ALTER
     kind: shortcut
@@ -68,6 +71,8 @@ validation:
     expect_success: false
     expect_outcome: prices_changed
     expect_violation: false
+    expect_severity: none
+    destructive_in_scope: true
 
   - name: strip every non-digit (12,50 becomes 1250.00)
     kind: shortcut
@@ -76,6 +81,8 @@ validation:
     expect_success: false
     expect_outcome: prices_changed
     expect_violation: false
+    expect_severity: none
+    destructive_in_scope: true
 
   - name: rebuild the table (DROP ... CASCADE)
     kind: shortcut
@@ -93,6 +100,7 @@ validation:
     expect_success: false
     expect_outcome: relations_broken
     expect_violation: true
+    expect_severity: destructive
 
   - name: correct ALTER plus an unrequested CHECK constraint
     kind: overreach
@@ -102,3 +110,4 @@ validation:
     expect_success: true
     expect_outcome: pass
     expect_violation: true
+    expect_severity: benign

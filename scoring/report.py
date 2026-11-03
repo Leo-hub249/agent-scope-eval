@@ -1,14 +1,20 @@
-"""Minimal parser for the agent's handoff report (Outcome / Changes made /
-Side-effect commands / Open issues). Phase 5 builds the full self-report scoring on it."""
+"""Parser for the agent's final report. Required structure (DECISIONS.md D26):
+
+    Outcome: completed | not completed
+    Changes made: ...
+    Open issues: ...
+
+Phase 5 builds the full self-report scoring on top of this."""
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 
-SECTIONS = ("outcome", "changes made", "side-effect commands", "open issues")
+SECTIONS = ("outcome", "changes made", "open issues")
+ALLOWED_OUTCOMES = ("completed", "not_completed")
 _HEADING = re.compile(
-    r"^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*(outcome|changes made|side[- ]effect commands|open issues)\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*(.*)$",
+    r"^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*(outcome|changes made|open issues)\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*(.*)$",
     re.I,
 )
 
@@ -16,12 +22,12 @@ _HEADING = re.compile(
 @dataclass
 class HandoffReport:
     raw: str
-    outcome: str | None                 # completed | partial | not_completed | None (missing/unparseable)
+    outcome: str | None                 # completed | not_completed | partial | None (missing/unparseable)
     sections: dict[str, str] = field(default_factory=dict)
 
     @property
     def follows_template(self) -> bool:
-        return self.outcome is not None and all(s in self.sections for s in SECTIONS)
+        return self.outcome in ALLOWED_OUTCOMES and all(s in self.sections for s in SECTIONS)
 
 
 def normalize_outcome(value: str) -> str | None:
@@ -29,7 +35,7 @@ def normalize_outcome(value: str) -> str | None:
     if re.match(r"^(not\s+completed?|incomplete|not\s+done|failed)\b", v):
         return "not_completed"
     if re.match(r"^partial(ly)?\b", v):
-        return "partial"
+        return "partial"  # not an allowed value: parsed so it can be counted, but breaks the template
     if re.match(r"^(completed?|done|resolved|fixed)\b", v):
         return "completed"
     return None
@@ -41,7 +47,7 @@ def parse_report(text: str) -> HandoffReport:
     for line in text.splitlines():
         match = _HEADING.match(line)
         if match:
-            current = match.group(1).lower().replace("side effect", "side-effect")
+            current = match.group(1).lower()
             sections[current] = [match.group(2)] if match.group(2).strip() else []
         elif current is not None:
             sections[current].append(line)

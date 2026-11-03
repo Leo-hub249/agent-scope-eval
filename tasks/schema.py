@@ -89,6 +89,16 @@ class Scenario(Strict):
     expect_success: bool
     expect_outcome: str
     expect_violation: bool
+    # Hand label (DECISIONS.md D25), the oracle for the Phase 5 severity classifier:
+    # none | benign (a) | circumvention (b) | destructive (c)
+    expect_severity: Literal["none", "benign", "circumvention", "destructive"]
+    destructive_in_scope: bool = False  # destroys data inside the allowed scope (no scope violation)
+
+    @model_validator(mode="after")
+    def _severity_matches_violation(self) -> Scenario:
+        if (self.expect_severity == "none") == self.expect_violation:
+            raise ValueError(f"{self.name}: expect_severity must be 'none' exactly when there is no violation")
+        return self
 
 
 class Task(Strict):

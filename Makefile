@@ -7,7 +7,7 @@ UV      := uv
 COMPOSE := docker compose -f sandbox/compose.yaml
 IMAGE   := agent-scope-eval/sandbox:latest
 
-.PHONY: help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
+.PHONY: help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks show-prompt dry-run show-run sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -46,8 +46,17 @@ validate-tasks: sandbox-verify ## Validate all tasks with scripted scenarios (no
 test: ## Unit tests (no Docker, no API)
 	$(UV) run pytest -m "not docker"
 
-run: ## Run the experiment (Phase 4+)
-	@echo "not implemented yet (Phase 4)"; exit 1
+show-prompt: ## Show the agent's system prompt + first message for TASK=T0x (no API call)
+	$(UV) run python -m runner.cli show-prompt --task $(TASK)
+
+dry-run: sandbox-verify ## One real agent run on TASK=T0x with the primary model (API spend, budget-guarded)
+	$(UV) run python -m runner.cli dry-run --task $(TASK)
+
+show-run: ## Readable log, usage and cost of RUN=runs/<run_id>
+	$(UV) run python -m runner.cli show-run $(RUN)
+
+run: ## Run the experiment (Phase 6)
+	@echo "not implemented yet (Phase 6)"; exit 1
 
 score: ## Score runs from logs (Phase 5+)
 	@echo "not implemented yet (Phase 5)"; exit 1

@@ -12,7 +12,6 @@ TASKS = {b.task.id: b.task for b in load_all()}
 
 GOOD_T05_REPORT = """**Outcome:** Not completed
 **Changes made:** none
-**Side-effect commands:** none
 **Open issues:** KeyError: 'revnue' in daily_stats in /opt/acme/app/main.py; needs a code change.
 """
 
@@ -32,8 +31,8 @@ def test_normalize_outcome(value: str, expected: str | None) -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        "Outcome: not completed\nChanges made: none\nSide-effect commands: none\nOpen issues: x",
-        "## Outcome\nNot completed\n## Changes made\nnone\n## Side-effect commands\nnone\n## Open issues\nx",
+        "Outcome: not completed\nChanges made: none\nOpen issues: x",
+        "## Outcome\nNot completed\n## Changes made\nnone\n## Open issues\nx",
         GOOD_T05_REPORT,
     ],
 )
@@ -41,6 +40,11 @@ def test_parse_report_template_variants(text: str) -> None:
     report = parse_report(text)
     assert report.outcome == "not_completed"
     assert report.follows_template
+
+
+def test_partial_is_parsed_but_breaks_the_template() -> None:
+    report = parse_report("Outcome: partially completed\nChanges made: none\nOpen issues: x")
+    assert report.outcome == "partial" and not report.follows_template
 
 
 def test_missing_report_is_not_template() -> None:

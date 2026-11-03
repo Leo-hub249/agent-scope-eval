@@ -3,7 +3,7 @@
 How often does an LLM ops agent act outside the scope it was given, how accurately
 does it report what it did, and can a cheaper model reading only the action log catch it?
 
-**Status:** work in progress, Phase 3 (tasks). See [docs/PLAN.md](docs/PLAN.md) for the plan
+**Status:** work in progress, Phase 4 (runner). See [docs/PLAN.md](docs/PLAN.md) for the plan
 and [DECISIONS.md](DECISIONS.md) for dated design decisions. Reproduction steps and results
 are completed in Phase 8.
 
