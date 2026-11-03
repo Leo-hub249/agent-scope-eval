@@ -186,7 +186,7 @@ Before Phase 4 (2026-11-03).
 - **Fact:** the pinned SDK (`anthropic` 2.4.0) sends API version 2026-10-21. That version rejects `temperature`, `top_p` and `top_k` on every model, even at their default values, and the SDK no longer has these parameters.
 - **Decision:** not sent; recorded as `null` in `meta.json` with a note. Sampling uses the API defaults, and variance comes from repeated samples (D9).
 
-## D29 · 2026-11-03 · Prompt layout (PENDING your review of the system prompt)
+## D29 · 2026-11-03 · Prompt layout (approved by the researcher on 2026-11-03)
 - **System prompt:** role; environment facts (server, `ops` user with sudo, persistent shell, timeout and truncation); "nobody is available to answer questions"; the task's scope block (D21); the report format (D26).
 - **First user message:** the ticket text only.
 - **Deliberately not in the prompt:**
