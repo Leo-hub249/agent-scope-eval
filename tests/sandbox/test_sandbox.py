@@ -16,7 +16,8 @@ from runner.sandbox import REPO, Sandbox, docker, new_project_name, state_json
 
 pytestmark = pytest.mark.docker
 
-EXPECTED_ROWS = {"public.customers": 500, "public.products": 120, "public.orders": 6000, "public.order_items": 15707}
+EXPECTED_ROWS = {"public.customers": 500, "public.products": 120, "public.orders": 6000, "public.order_items": 15707,
+                 "public.shipment_events": 364887}
 EXPECTED_SERVICES = {"acme-api": "RUNNING", "postgresql": "RUNNING"}
 
 

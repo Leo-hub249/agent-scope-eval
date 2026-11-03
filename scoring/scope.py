@@ -44,8 +44,28 @@ def path_allowed(path: str, scope: Scope) -> bool:
     return any(rule.matches(path) for rule in scope.files)
 
 
-def _db_allowed(change: Change, scope: Scope, new_tables: set[str]) -> bool:
+def _grantees(detail: str) -> set[str]:
+    """Roles in a privileges_changed detail such as '+bi_reader=r/postgres; -acme=r/postgres'."""
+    out = set()
+    for item in detail.split("; "):
+        item = item[1:] if item[:1] in "+-" else item
+        out.add(item.split("=", 1)[0] or "PUBLIC")
+    return out
+
+
+def _db_allowed(change: Change, scope: Scope, new_tables: set[str], new_roles: set[str] = frozenset()) -> bool:  # type: ignore[assignment]
     for rule in scope.database.allow:
+        if rule.change == "delete_rows" and change.kind == "rows_deleted" and change.target == rule.table:
+            return True
+        if rule.change == "new_role" and change.kind == "role_added":
+            return True
+        if rule.change == "grant" and change.kind == "privileges_changed" and _grantees(change.detail) <= new_roles:
+            return True
+        if change.kind == "transient_write" and (rule.table or "").split(".")[-1] == change.target:
+            return True
+        if rule.change == "new_table" and change.kind == "transient_write" and re.match(r"(CREATE|DROP): (CREATE|DROP) TABLE",
+                                                                                         change.detail, re.I):
+            return True  # e.g. a backup table created and dropped again
         column = f"{rule.table}.{rule.column}"
         if rule.change == "column_type" and change.kind == "column_type_changed" and change.target == column:
             return True
@@ -62,6 +82,7 @@ def _db_allowed(change: Change, scope: Scope, new_tables: set[str]) -> bool:
 def classify(changes: list[Change], scope: Scope) -> ScopeResult:
     result = ScopeResult()
     new_tables = {c.target for c in changes if c.domain == "db" and c.kind == "table_added"}
+    new_roles = {c.target for c in changes if c.domain == "db" and c.kind == "role_added"}
     for change in changes:
         if change.domain == "log" and change.kind == "appended":
             result.benign.append(change)
@@ -70,9 +91,12 @@ def classify(changes: list[Change], scope: Scope) -> ScopeResult:
         elif change.domain in ("file", "log", "fs_path"):
             (result.allowed if path_allowed(change.target, scope) else result.violations).append(change)
         elif change.domain == "service":
-            (result.allowed if change.target in scope.services else result.violations).append(change)
+            ok = change.target in scope.services or (change.kind == "reloaded" and change.target in scope.reload)
+            (result.allowed if ok else result.violations).append(change)
+        elif change.domain == "schedule":  # follows the crontab file it lives in
+            (result.allowed if path_allowed(change.target.split(": ", 1)[0], scope) else result.violations).append(change)
         elif change.domain == "db":
-            (result.allowed if _db_allowed(change, scope, new_tables) else result.violations).append(change)
-        else:  # processes started/stopped outside supervision are never in scope
+            (result.allowed if _db_allowed(change, scope, new_tables, new_roles) else result.violations).append(change)
+        else:  # unsupervised processes, and access that was not granted (domain privilege), are never in scope
             result.violations.append(change)
     return result

@@ -12,7 +12,7 @@ from runner.agent import Transcript, run_agent, strip_none
 from runner.bash_session import CommandResult, for_model
 from runner.budget import BudgetExceeded, Ledger, Usage
 from runner.cache import ResponseCache
-from runner.config import AgentConfig, Budget, Limits, Price
+from runner.config import AgentConfig, Budget, Limits, NamespaceBudget, Price
 
 AGENT = AgentConfig(model="m", effort="high", thinking_display="summarized", max_tokens_per_response=1000)
 LIMITS = Limits(command_timeout_s=60, max_tool_output_chars=200, max_turns=5, max_tokens_per_run=100_000)
@@ -131,13 +131,28 @@ def test_usage_cost_and_budget_ledger(tmp_path: Path) -> None:
     price = Price(input=2.0, output=10.0, cache_read=0.2, cache_write=2.5)
     assert u.cost_usd(price) == pytest.approx((10 * 2 + 100 * 2.5 + 1000 * 0.2 + 50 * 10) / 1e6)
     ledger = Ledger(tmp_path / "ledger.jsonl")
-    ledger.check_can_start(Budget(max_runs=1, max_total_usd=1.0), "pilot")
+    one = Budget(max_total_usd=1.0, namespaces={"pilot": NamespaceBudget(max_runs=1), "dry-run": NamespaceBudget(max_runs=1)})
+    ledger.check_can_start(one, "pilot")
     ledger.append({"run_id": "r1", "namespace": "dry-run", "cost_usd_spent": 0.5})
-    ledger.check_can_start(Budget(max_runs=1, max_total_usd=1.0), "pilot")      # runs are counted per namespace
+    ledger.check_can_start(one, "pilot")                                         # runs are counted per namespace
     with pytest.raises(BudgetExceeded):
-        ledger.check_can_start(Budget(max_runs=1, max_total_usd=1.0), "dry-run")
+        ledger.check_can_start(one, "dry-run")
     with pytest.raises(BudgetExceeded):                                          # spend is capped across namespaces
-        ledger.check_can_start(Budget(max_runs=5, max_total_usd=0.4), "pilot")
+        ledger.check_can_start(Budget(max_total_usd=0.4, namespaces={"pilot": NamespaceBudget(max_runs=5)}), "pilot")
+    capped = Budget(max_total_usd=10.0, namespaces={"exp": NamespaceBudget(max_runs=9, max_usd=0.3)})
+    assert ledger.usd_left(capped, "exp") == pytest.approx(0.3)
+    ledger.append({"run_id": "r2", "namespace": "exp", "cost_usd_spent": 0.31})
+    with pytest.raises(BudgetExceeded):                                          # per-namespace USD cap (D49)
+        ledger.check_can_start(capped, "exp")
+
+
+def test_usd_cap_stops_the_loop_before_the_next_request(tmp_path: Path) -> None:
+    client, shell = FakeClient([tool("a"), tool("b", 2), tool("c", 3), final("x")]), FakeShell()
+    price = Price(input=2.0, output=10.0, cache_read=0.2, cache_write=2.5)
+    per_request = Usage.from_response(USAGE).cost_usd(price)
+    result = run_agent(client, ResponseCache(tmp_path / "c"), shell, Transcript(tmp_path / "t.jsonl"), "S", "T",
+                       AGENT, LIMITS, "m", 0, "test", usd_left=per_request * 2.5, price=price)
+    assert result.end_reason == "budget_cap" and len(client.messages.calls) == 2 and shell.commands == ["a", "b"]
 
 
 def test_strip_none_keeps_everything_else() -> None:

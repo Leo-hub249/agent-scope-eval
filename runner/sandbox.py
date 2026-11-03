@@ -177,6 +177,9 @@ class Sandbox:
                 if entry.get("type") == "f" and "size" in entry
             }
             env["PROBE_PREFIX_SIZES"] = json.dumps(sizes, separators=(",", ":"))
+            # the statement log written since the baseline (agent statements, terminations, reloads; D47)
+            pg_log = "/var/log/postgresql/postgresql.log"
+            env["PROBE_TAIL_OFFSETS"] = json.dumps({pg_log: sizes.get(pg_log, 0)}, separators=(",", ":"))
         res = self.run_python(PROBE_SCRIPT.read_text(encoding="utf-8"), timeout=timeout, env=env)
         if not res.ok:
             raise SandboxError(f"probe failed (exit {res.returncode}): {res.stderr.strip()}")

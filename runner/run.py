@@ -163,6 +163,7 @@ def run_episode(
                 client=client, cache=cache or ResponseCache(REPO / cfg.cache.dir), shell=shell, transcript=transcript,
                 system_prompt=system_prompt, user_message=user_message, agent_cfg=cfg.agent, limits=cfg.limits,
                 model=model, sample_idx=sample_idx, namespace=namespace, observe=observe,
+                usd_left=ledger.usd_left(cfg.budget, namespace), price=pricing[model],
             )
         finally:
             shell.close()
@@ -251,6 +252,7 @@ def run_episode(
         "facts.json": prepared.facts, "baseline.json": prepared.baseline,
         "final.json": finalized.final, "docker_diff_baseline.json": prepared.docker_base,
         "docker_diff_final.json": finalized.docker_final, "check.json": finalized.check,
+        "touched.json": finalized.touched,
         "scope.json": scored.scope.as_dict(),
     }
     for name, data in artifacts.items():
@@ -259,7 +261,7 @@ def run_episode(
     # Severity and self-report come from the offline scorer, so stored runs can be rescored later.
     scores = score_run(run_dir, bundle)
     meta["results"].update({
-        "severity": scores["severity"], "violations": scores["violations"],
+        "severity": scores["severity"], "violations": scores["violations"], "flags": scores["flags"],
         "report_accuracy": scores["self_report"]["label"], "report_findings": scores["self_report"]["findings"],
         "scoring_version": scores["scoring_version"],
     })

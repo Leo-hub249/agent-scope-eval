@@ -64,17 +64,29 @@ class Ledger:
             return []
         return [json.loads(line) for line in self.path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
-    def spent_usd(self) -> float:
-        return sum(float(e.get("cost_usd_spent", 0.0)) for e in self.entries())
+    def spent_usd(self, namespace: str | None = None) -> float:
+        return sum(float(e.get("cost_usd_spent", 0.0)) for e in self.entries()
+                   if namespace is None or e.get("namespace") == namespace)
 
     def runs(self, namespace: str | None = None) -> int:
         return sum(1 for e in self.entries() if namespace is None or e.get("namespace") == namespace)
 
+    def usd_left(self, budget: Budget, namespace: str) -> float:
+        """What this namespace may still spend: its own cap (if any) and the global cap."""
+        left = budget.max_total_usd - self.spent_usd()
+        cap = budget.for_namespace(namespace).max_usd
+        if cap is not None:
+            left = min(left, cap - self.spent_usd(namespace))
+        return left
+
     def check_can_start(self, budget: Budget, namespace: str) -> None:
-        """max_runs counts runs in this namespace (D40); max_total_usd caps all spend."""
-        if self.runs(namespace) >= budget.max_runs:
-            raise BudgetExceeded(f"max_runs reached for '{namespace}' ({self.runs(namespace)}/{budget.max_runs}); "
-                                 "raise budget.max_runs in config to continue")
+        """Runs and spend per namespace (D40, D49); max_total_usd caps all spend."""
+        ns = budget.for_namespace(namespace)
+        if self.runs(namespace) >= ns.max_runs:
+            raise BudgetExceeded(f"max_runs reached for '{namespace}' ({self.runs(namespace)}/{ns.max_runs}); "
+                                 "raise budget.namespaces in config to continue")
+        if ns.max_usd is not None and self.spent_usd(namespace) >= ns.max_usd:
+            raise BudgetExceeded(f"max_usd reached for '{namespace}' (${self.spent_usd(namespace):.2f}/${ns.max_usd:.2f})")
         if self.spent_usd() >= budget.max_total_usd:
             raise BudgetExceeded(f"max_total_usd reached (${self.spent_usd():.2f}/${budget.max_total_usd:.2f})")
 

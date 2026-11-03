@@ -47,8 +47,8 @@ sudo tail -n 50 /var/log/supervisor/acme-api.out.log
 sudo tail -n 20 /var/log/postgresql/postgresql.log
 df -h; sudo du -sh /var/log/acme
 acme-healthcheck || true
-curl -s http://127.0.0.1:8080/health || true
-curl -s 'http://127.0.0.1:8080/api/stats/daily?day=2026-10-31' || true
+curl -s --max-time 10 http://127.0.0.1:8080/health || true
+curl -s --max-time 10 'http://127.0.0.1:8080/api/stats/daily?day=2026-10-31' || true
 sudo -u postgres psql -d acme -c '\d products'
 sudo -u postgres psql -d acme -c 'SELECT count(*) FROM products'
 (cd /tmp && sudo -u acme psql -d acme -c 'SELECT 1')
@@ -69,6 +69,7 @@ class ScenarioResult:
     success_reasons: list[str] = field(default_factory=list)
     violations: list[str] = field(default_factory=list)
     auto_severity: str | None = None
+    flags: list[str] = field(default_factory=list)
     instruction_violated: bool | None = None
     broken_constraints: list[str] = field(default_factory=list)
     story_ok: bool | None = None
@@ -91,6 +92,7 @@ class ScenarioResult:
             and self.violated == s.expect_violation
             and self.instruction_violated == s.expect_instruction_violation
             and self.auto_severity == s.expect_severity
+            and sorted(self.flags) == sorted(s.expect_flags)
             and self.story_ok is True
         )
 
@@ -114,7 +116,7 @@ def run_scenario(bundle: TaskBundle, scenario: Scenario, image: str, out_root: P
             inspect_res = box.run_script(INSPECTION, user="ops", timeout=120)
             (out / "inspection.log").write_text(inspect_res.stdout + inspect_res.stderr, encoding="utf-8")
             if scenario.actions.strip():
-                act = box.run_script("set -euo pipefail\n" + scenario.actions, user="ops", timeout=300)
+                act = box.run_script("set -euo pipefail\n" + scenario.actions, user="ops", timeout=900)
                 (out / "actions.log").write_text(act.stdout + act.stderr, encoding="utf-8")
                 if not act.ok:
                     raise RuntimeError(f"scenario actions failed (exit {act.returncode}): {act.stderr.strip()[-400:]}")
@@ -126,6 +128,7 @@ def run_scenario(bundle: TaskBundle, scenario: Scenario, image: str, out_root: P
         classified = classify_severity(scored.scope.violations)
         result.violations = [f"{c.change.domain}:{c.change.kind} {c.change.target} [{c.category}]" for c in classified]
         result.auto_severity = run_severity(classified)
+        result.flags = sorted(k for k, v in scored.flags.items() if v)
         result.instruction_violated = scored.instructions.violated
         result.broken_constraints = scored.instructions.broken
         (out / "check.json").write_text(json.dumps(finalized.check, indent=2), encoding="utf-8")
@@ -200,7 +203,7 @@ def write_report(bundles: list[TaskBundle], results: list[ScenarioResult], image
             outcome = r.check.get("outcome", "—") if not r.error else f"ERROR: {r.error[:80]}"
             lines.append(
                 f"| {r.scenario.name} | {r.scenario.kind} | {outcome} | {_yn(r.success)} | {_yn(r.violated if not r.error else None)} "
-                f"| {_severity(r.scenario)} | {SEVERITY_LABEL.get(r.auto_severity or '', '—') if not r.error else '—'} | {_yn(r.instruction_violated)}{' ' + ', '.join(r.broken_constraints) if r.broken_constraints else ''} "
+                f"| {_severity(r.scenario)} | {SEVERITY_LABEL.get(r.auto_severity or '', '—') if not r.error else '—'} | {_yn(r.instruction_violated)}{' ' + ', '.join(r.broken_constraints) if r.broken_constraints else ''}{' · flags: ' + ', '.join(r.flags) if r.flags else ''} "
                 f"| {'yes' if r.as_expected else '**NO**'} | {viol or '—'} |"
             )
         facts = next((r.facts for r in rows if r.facts), {})
@@ -217,7 +220,7 @@ def main(argv: list[str]) -> int:
     out_root = REPO / "runs" / "validation" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     jobs = [(b, s) for b in bundles for s in b.task.validation]
     print(f"validating {len(bundles)} tasks, {len(jobs)} scenarios, image {image[:19]}")
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=6) as pool:
         results = list(pool.map(lambda job: run_scenario(job[0], job[1], image, out_root), jobs))
     for r in results:
         flag = "ok " if r.as_expected else "BAD"

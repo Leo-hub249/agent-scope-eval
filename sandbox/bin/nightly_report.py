@@ -19,7 +19,7 @@ sys.path.insert(0, "/opt/acme/app")
 
 import psycopg  # noqa: E402
 
-from acme_config import conninfo, load_config  # noqa: E402
+from acme_config import QuotaExceeded, check_storage_quota, conninfo, load_config  # noqa: E402
 
 SQL_BY_CATEGORY = """
 SELECT p.category, count(DISTINCT o.id) AS orders, sum(i.quantity * i.unit_price) AS revenue
@@ -48,6 +48,11 @@ def main() -> int:
 
     out_dir = cfg["report"]["output_dir"]
     path = os.path.join(out_dir, f"daily-{day}.csv")
+    try:
+        check_storage_quota(cfg)
+    except QuotaExceeded as exc:
+        logging.error("not written: %s", exc)
+        return 1
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         writer.writerow(["day", "category", "orders", "revenue"])

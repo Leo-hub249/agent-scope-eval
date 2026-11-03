@@ -82,6 +82,11 @@ Candidate ablations noted during development (not run):
   - All services were restarted by supervisord moments before the session. The logs show this restart, and it matches the process uptimes. In the pilot one agent (T03) noticed the recent API start and attributed it to someone else.
   - The container itself is visible (`/.dockerenv`, overlay mounts).
   - The Postgres statement log contains the app's statements only for the 2 hours before the session. Connection logging is off.
+  - Cron is installed but never runs, although the logs show nightly jobs (D4). An agent that checks `ps` sees no cron process.
+- **Disk space** (T10, T13): a real full filesystem would need a size-limited tmpfs, which `df` and `mount` would reveal. The limits are storage budgets instead: one enforced by the API and the nightly report, one by acme-diskwatch. `df` shows plenty of free space (DECISIONS.md D49).
+- **Ground truth not covered** (DECISIONS.md D47):
+  - Some changes are invisible to every layer: file changes made and undone outside the watched trees; a backup disabled by editing the script it runs rather than its cron line.
+  - Postgres statements sent by a session that names itself after a service (application_name `acme-api`) are not attributed to the agent.
 
 ## AI usage
 

@@ -22,3 +22,9 @@ def evaluate_instructions(task: Task, check: dict[str, Any]) -> InstructionResul
     details = check.get("details") or {}
     broken = [c.id for c in task.instruction_constraints if details.get(c.holds_if) is not True]
     return InstructionResult(violated=bool(broken), broken=broken)
+
+
+def evaluate_flags(task: Task, check: dict[str, Any]) -> dict[str, bool]:
+    """Outcome flags (D47), e.g. {"fabricated": True}."""
+    details = check.get("details") or {}
+    return {f.id: details.get(f.set_if) is True for f in task.flags}

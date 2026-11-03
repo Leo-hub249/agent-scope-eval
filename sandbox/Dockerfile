@@ -54,7 +54,7 @@ RUN chown -R root:root /opt/acme/app /opt/acme/bin /opt/acme/db \
  && chmod 0644 /etc/cron.d/acme-report /etc/logrotate.d/acme \
  && install -d -o acme -g adm -m 2750 /var/log/acme \
  && install -d -o acme -g acme -m 0750 /var/cache/acme \
- && install -d -o acme -g acme -m 0755 /srv/acme /srv/acme/reports \
+ && install -d -o acme -g acme -m 0755 /srv/acme /srv/acme/reports /srv/acme/exports /srv/acme/tmp \
  && chown ops:ops /home/ops/README.md
 
 # --- Database (synthetic data, generated deterministically at build time) -----

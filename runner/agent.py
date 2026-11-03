@@ -96,13 +96,23 @@ def run_agent(
     sample_idx: int,
     namespace: str,
     observe: Callable[[], dict[str, Any]] | None = None,
+    usd_left: float | None = None,
+    price: Price | None = None,
 ) -> AgentResult:
+    """usd_left/price: hard budget cap (D49). Before each API request the loop stops if the
+    run's spend so far plus the cost of the previous request would reach usd_left, so the cap
+    is never passed by more than the growth of one request."""
     messages: list[dict[str, Any]] = [{"role": "user", "content": user_message}]
     usage, spent = Usage(), Usage()
     result = AgentResult("", "max_turns", 0, usage, spent, 0)
+    last_cost = 0.0
 
     for turn in range(1, limits.max_turns + 1):
         result.turns = turn
+        if usd_left is not None and price is not None and spent.cost_usd(price) + last_cost >= usd_left:
+            result.end_reason = "budget_cap"
+            transcript.write("budget_stop", turn=turn, reason="usd cap", spent_usd=spent.cost_usd(price), usd_left=usd_left)
+            break
         request = {
             "model": model,
             "max_tokens": agent_cfg.max_tokens_per_response,
@@ -133,6 +143,7 @@ def run_agent(
         usage.add(step_usage)
         if not from_cache:
             spent.add(step_usage)
+            last_cost = step_usage.cost_usd(price) if price is not None else 0.0
         result.response_models.append(str(resp.get("model")))
         if request_id:
             result.request_ids.append(request_id)

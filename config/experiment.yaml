@@ -24,9 +24,30 @@ sampling:
   samples_per_task: 5               # the API is not seedable: variance comes from repeated samples
   task_order_seed: 1234             # our own RNG only
 
-budget:                             # ledger: runs/ledger.jsonl
-  max_runs: 5                       # per namespace (D40): the pilot = one run per task; raised again only with your OK
-  max_total_usd: 5.00               # across all namespaces
+budget:                             # ledger: runs/ledger.jsonl (D40, D49)
+  max_total_usd: 62.00              # all namespaces together (dry run + pilot $0.17, calibration, experiment)
+  default_max_runs: 1               # any namespace not listed below
+  namespaces:
+    dry-run:     {max_runs: 1}
+    pilot:       {max_runs: 5}
+    calibration: {max_runs: 14, max_usd: 1.50}     # approved 2026-11-03: about $1
+    experiment:  {max_runs: 225, max_usd: 60.00}   # approved 2026-11-03: hard cap $60, the runner stops at the cap
+
+calibration:                        # namespace "calibration", sample 0 each (D49)
+  - {task: T06, model: claude-sonnet-5-5}
+  - {task: T07, model: claude-sonnet-5-5}
+  - {task: T08, model: claude-sonnet-5-5}
+  - {task: T09, model: claude-sonnet-5-5}
+  - {task: T10, model: claude-sonnet-5-5}
+  - {task: T11, model: claude-sonnet-5-5}
+  - {task: T12, model: claude-sonnet-5-5}
+  - {task: T13, model: claude-sonnet-5-5}
+  - {task: T14, model: claude-sonnet-5-5}
+  - {task: T15, model: claude-sonnet-5-5}
+  - {task: T02, model: claude-opus-5-5}       # token profiles of the other two models,
+  - {task: T12, model: claude-opus-5-5}       # on one old and one new task
+  - {task: T02, model: claude-haiku-5-5}
+  - {task: T12, model: claude-haiku-5-5}
 
 cache:
   dir: cache                        # gitignored; key = request + sample index + namespace

@@ -7,7 +7,7 @@ UV      := uv
 COMPOSE := docker compose -f sandbox/compose.yaml
 IMAGE   := agent-scope-eval/sandbox:latest
 
-.PHONY: labels-export labels-compare help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks show-prompt dry-run show-run pilot sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
+.PHONY: calibrate labels-export labels-compare help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks show-prompt dry-run show-run pilot sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -63,6 +63,9 @@ run: ## Run the experiment (Phase 6)
 
 score: ## Rescore every stored run offline (no API, no Docker) -> runs/<id>/scores.json
 	$(UV) run python -m scoring.score runs/2*Z-*
+
+calibrate: sandbox-verify ## Calibration runs listed in config/experiment.yaml (namespace calibration; API spend, capped)
+	$(UV) run python -m runner.cli calibrate
 
 labels-export: ## Blind labelling packets + blank labels.yaml for the dry run and pilot -> labels/phase5/
 	$(UV) run python -m scoring.labels export --namespaces dry-run pilot --out labels/phase5

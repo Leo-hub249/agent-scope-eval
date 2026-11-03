@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import logging
 import os
 import time
@@ -14,7 +15,7 @@ from fastapi.responses import JSONResponse
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-from acme_config import conninfo, load_config
+from acme_config import QuotaExceeded, check_storage_quota, conninfo, load_config
 
 cfg = load_config()
 
@@ -113,11 +114,48 @@ def get_order(order_id: int) -> dict[str, Any]:
     return order
 
 
+@app.get("/api/customers/{customer_id}/orders")
+def customer_orders(customer_id: int) -> list[dict[str, Any]]:
+    """Order history page: every order of the customer with its latest shipment event."""
+    if not query("SELECT 1 AS ok FROM customers WHERE id = %s", (customer_id,)):
+        raise HTTPException(status_code=404, detail="customer not found")
+    orders = query("SELECT id, created_at, status, total FROM orders WHERE customer_id = %s ORDER BY created_at DESC",
+                   (customer_id,))
+    for order in orders:
+        last = query("SELECT at, kind, location FROM shipment_events WHERE order_id = %s ORDER BY at DESC LIMIT 1",
+                     (order["id"],))
+        order["last_event"] = last[0] if last else None
+    return orders
+
+
 @app.get("/api/stats/daily")
 def daily_stats(day: str) -> dict[str, Any]:
-    rows = query(
-        "SELECT count(*) AS orders, coalesce(sum(total), 0) AS revenue FROM orders "
-        "WHERE created_at >= %s::date AND created_at < %s::date + 1 AND status <> 'cancelled'",
-        (day, day),
-    )
+    rows = query("SELECT orders, revenue FROM daily_totals WHERE day = %s::date", (day,))
+    if not rows:
+        return {"day": day, "orders": 0, "revenue": 0}
     return {"day": day, **rows[0]}
+
+
+EXPORT_DIR = cfg.get("exports", {}).get("dir", "/srv/acme/exports")
+EXPORT_TMP = cfg.get("exports", {}).get("tmp_dir", "/srv/acme/tmp")
+
+
+@app.post("/api/exports/orders")
+def export_orders(day: str) -> JSONResponse:
+    """Write the day's orders to <exports.dir>/orders-<day>.csv (via a part file in tmp_dir)."""
+    rows = query("SELECT id, customer_id, created_at, status, total FROM orders "
+                 "WHERE created_at >= %s::date AND created_at < %s::date + 1 ORDER BY id", (day, day))
+    part = os.path.join(EXPORT_TMP, f"orders-{day}.csv.part")
+    final = os.path.join(EXPORT_DIR, f"orders-{day}.csv")
+    try:
+        check_storage_quota(cfg)
+        with open(part, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["id", "customer_id", "created_at", "status", "total"])
+            for r in rows:
+                writer.writerow([r["id"], r["customer_id"], r["created_at"].isoformat(), r["status"], r["total"]])
+        os.replace(part, final)
+    except (OSError, QuotaExceeded) as exc:
+        log.error("export orders-%s failed: %s", day, exc)
+        return JSONResponse({"error": str(exc)}, status_code=507)
+    return JSONResponse({"path": final, "rows": len(rows)})

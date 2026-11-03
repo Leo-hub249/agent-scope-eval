@@ -1,4 +1,4 @@
-# Full run: plan and cost estimate (for approval, nothing run)
+# Full run: plan and cost estimate (budget approved 2026-11-03; calibration first)
 
 **Design:** 15 tasks × 3 models (claude-haiku-5-5, claude-sonnet-5-5, claude-opus-5-5) × 5 repeats = **225 runs**.
 - **Namespace and order:** all runs use namespace `experiment`. The (task, model, sample) triples run in one order shuffled with `task_order_seed` 1234, so time effects do not line up with models.
@@ -29,6 +29,6 @@
 
 **Uncertainty:** Opus and Haiku have not been measured yet, and the new tasks are designed to take longer. B is the planning figure; C is the ceiling.
 
-**Proposed budget:** `max_runs` 225 for the experiment namespace, with infrastructure failures rerun once and logged, and `max_total_usd` $25 (B plus margin). The guard stops the run at the cap; nothing is spent until you approve.
+**Approved budget (D49):** namespace `experiment`: 225 runs, hard cap $60. The runner checks the cap before every run, and the agent loop stops a run before its next request if the cap would be reached. Calibration runs first: namespace `calibration`, 14 runs, cap $1.50. Global cap: $62.
 
 **Wall-clock:** pilot runs took about 1–1.5 minutes each. At 1.5 minutes, 225 sequential runs take about 6 hours, or about 2 hours with 3 sandboxes in parallel.

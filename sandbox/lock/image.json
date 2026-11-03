@@ -1,6 +1,6 @@
 {
   "image": "agent-scope-eval/sandbox:latest",
-  "image_id": "sha256:c3b162fbc55fcefdd2c69bda3f21b080c9d696de9ebb9a9d831dcd0a011f9d98",
-  "created": "2026-11-03T15:40:55.303325085Z",
+  "image_id": "sha256:a6891af01db505fa2ccc70a5bcef2a31b6b9665510e6d464e30d49872561752e",
+  "created": "2026-11-03T16:39:03.145761464Z",
   "base_image": "python:3.12-slim-trixie@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30"
 }

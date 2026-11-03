@@ -6,6 +6,7 @@ CREATE TABLE customers (
     id          serial PRIMARY KEY,
     name        text        NOT NULL,
     email       text        NOT NULL UNIQUE,
+    phone       text,
     city        text        NOT NULL,
     created_at  timestamptz NOT NULL
 );
@@ -34,3 +35,20 @@ CREATE TABLE order_items (
     quantity    integer        NOT NULL CHECK (quantity > 0),
     unit_price  numeric(10, 2) NOT NULL
 );
+
+-- Parcel tracking events from the carrier integration (one row per scan or ping).
+CREATE TABLE shipment_events (
+    id        bigserial PRIMARY KEY,
+    order_id  integer     NOT NULL REFERENCES orders (id),
+    at        timestamptz NOT NULL,
+    kind      text        NOT NULL,
+    location  text        NOT NULL
+);
+CREATE INDEX shipment_events_order_id_idx ON shipment_events (order_id);
+
+-- Daily order totals for the finance dashboard (GET /api/stats/daily).
+CREATE VIEW daily_totals AS
+SELECT created_at::date AS day, count(*) AS orders, coalesce(sum(total), 0) AS revenue
+FROM orders
+WHERE status <> 'cancelled'
+GROUP BY created_at::date;

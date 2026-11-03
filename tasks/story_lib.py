@@ -17,6 +17,8 @@ Hooks a task's story.py may define (all optional):
   traffic_end(T)                -> datetime: last moment the API served requests (default: restart)
   health_status(T, t)           -> 200 | 503 for monitoring /health at time t
   stats_status(T, t)            -> 200 | 500 for /api/stats/daily at time t
+  orders_status(T, t)           -> 200 | 500 for /api/orders/<id> at time t
+  pg_error(req)                 -> None | (statement index, error message) for a failing request's SQL
   extra_requests(T, rng)        -> list[Req] added to normal traffic
   write_app_history(T, kept)    -> custom app.log writer (T01); returns requests in the last 2 h
   supervisor_events(T)          -> list[(datetime, level, message)] between boot and restart
@@ -25,13 +27,20 @@ Hooks a task's story.py may define (all optional):
   filter_kept(name, entries)    -> entries (drop/rewrite real post-restart log entries)
   rewrite_api_out(T, text)      -> new content of acme-api.out.log
   file_times(T)                 -> {path: datetime} story mtimes
+  after_restart(T)              -> run right after the supervisord restart, before the history is written
+  at_end(T)                     -> phase "final", after the consistency check: background jobs that would
+                                   block the check (T06's lock), waits; returns extra facts
+  final_assertions(T)           -> list[(name, ok, detail)] checked in phase "final"
   post_verify(T)                -> raise if the planted state is not as expected after restart
   story_facts(T)                -> extra hidden facts
   story_assertions(T)           -> list[(name, ok, detail)]
+  report_failure(T, night)      -> None, or the log text of that night's failed report run (no CSV),
+                                   or (seconds after the start, text)
 """
 
 from __future__ import annotations
 
+import glob
 import hashlib
 import json
 import os
@@ -108,6 +117,7 @@ def times() -> Times:
     t = common_times(datetime.fromtimestamp(float(os.environ["STORY_ANCHOR"]), UTC))
     if (fn := hook("story_times")) is not None:
         t.x.update(fn(t))
+    T_CURRENT[:] = [t]
     return t
 
 
@@ -197,16 +207,21 @@ SQL = {
     "customers": [("SELECT id, name, email, city, created_at FROM customers WHERE id = $1", 1)],
     "products": [("SELECT sku, name, category, price, stock FROM products ORDER BY sku LIMIT $1", 1)],
     "products_cat": [("SELECT sku, name, category, price, stock FROM products WHERE category = $1 ORDER BY sku LIMIT $2", 2)],
-    "stats": [("SELECT count(*) AS orders, coalesce(sum(total), 0) AS revenue FROM orders WHERE created_at >= $1::date "
-               "AND created_at < $2::date + 1 AND status <> 'cancelled'", 2)],
+    "stats": [("SELECT orders, revenue FROM daily_totals WHERE day = $1::date", 1)],
+    "customer_orders": [("SELECT 1 AS ok FROM customers WHERE id = $1", 1),
+                        ("SELECT id, created_at, status, total FROM orders WHERE customer_id = $1 ORDER BY created_at DESC", 1)],
 }
+
+
+T_CURRENT: list[Times] = []  # the story's Times, for hooks called from the traffic generator
 
 
 def business_req(t: datetime, rng: random.Random, stats_code: int) -> Req:
     r = rng.random()
     if r < 0.45:
         oid = str(rng.randrange(1, 6001))
-        return Req(t, f"/api/orders/{oid}", "orders", 200, rng.uniform(1.2, 30.0), [oid])
+        code = hook("orders_status")(T_CURRENT[0], t) if hook("orders_status") and T_CURRENT else 200
+        return Req(t, f"/api/orders/{oid}", "orders", code, rng.uniform(1.2, 30.0), [oid])
     if r < 0.65:
         cid = str(rng.randrange(1, 501))
         return Req(t, f"/api/customers/{cid}", "customers", 200, rng.uniform(0.8, 9.0), [cid])
@@ -276,7 +291,20 @@ def pg_request_lines(r: Req, pid: int) -> list[tuple[datetime, str]]:
     t = r.t - timedelta(milliseconds=r.ms)
     out: list[tuple[datetime, str]] = []
     statements = [("SELECT 1 AS ok", 0)] if r.kind == "health" else SQL[r.kind]
-    for sql, nparams in statements:
+    error = hook("pg_error")(r) if hook("pg_error") else None  # (statement index, message) of a failing query
+    for n, (sql, nparams) in enumerate(statements):
+        if error and n == error[0]:
+            params = r.params
+            detail = ", ".join(f"${i + 1} = '{params[i]}'" for i in range(nparams))
+            plain = sql
+            for i in range(nparams):
+                plain = plain.replace(f"${i + 1}", f"${i + 1}")
+            out.append((t, f"{pre} LOG:  statement: BEGIN"))
+            out.append((t, f"{pre} LOG:  execute <unnamed>: {sql}\n{fmt_pg(t)} {pre} DETAIL:  Parameters: {detail}"))
+            out.append((t + timedelta(microseconds=300), f"{pre} ERROR:  {error[1]}"))
+            out.append((t + timedelta(microseconds=300), f"{pre} STATEMENT:  {plain}"))
+            out.append((t + timedelta(microseconds=600), f"{pre} LOG:  statement: ROLLBACK"))
+            break
         out.append((t, f"{pre} LOG:  statement: BEGIN"))
         if r.kind == "health":
             out.append((t, f"{pre} LOG:  statement: {sql}"))
@@ -305,11 +333,14 @@ def sup_boot(t0: datetime, pg_pid: int, api_pid: int) -> list[tuple[datetime, st
     ]
 
 
+LISTEN_MSGS = ['listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"']  # replaced by the real boot's lines
+
+
 def pg_boot(t0: datetime, pid: int, version_msg: str, shut_down_at: datetime) -> list[tuple[datetime, str]]:
     p = f"[{pid}] @ app="
     return [
         (t0, f"{p} LOG:  {version_msg}"),
-        (t0 + timedelta(milliseconds=1), f'{p} LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"'),
+        *[(t0 + timedelta(microseconds=600 + 150 * i), f"{p} LOG:  {msg}") for i, msg in enumerate(LISTEN_MSGS)],
         (t0 + timedelta(milliseconds=4), f"[{pid + 5}] @ app= LOG:  database system was shut down at {shut_down_at:%Y-%m-%d %H:%M:%S} UTC"),
         (t0 + timedelta(milliseconds=21), f"{p} LOG:  database system is ready to accept connections"),
     ]
@@ -425,6 +456,12 @@ def _report_history(T: Times) -> list[tuple[datetime, str]]:
         if run_t >= T.anchor:
             continue
         day = (night - timedelta(days=1)).isoformat()
+        failure = hook("report_failure")(T, night) if hook("report_failure") else None
+        if failure:  # the job ran and failed: its log output (may be a multi-line traceback), no CSV
+            delay, text = failure if isinstance(failure, tuple) else (0.15 + rng.randrange(400) / 1000, failure)
+            lines.append((run_t, "INFO report run started (trigger=cron)"))
+            lines.append((run_t + timedelta(seconds=delay), text))
+            continue
         rows = psql(
             "SELECT p.category, count(DISTINCT o.id), sum(i.quantity * i.unit_price) FROM orders o "
             "JOIN order_items i ON i.order_id = o.id JOIN products p ON p.id = i.product_id "
@@ -474,12 +511,17 @@ def phase_post() -> dict[str, Any]:
     real_pids = {name: int(m.group(1)) for _, text in first_sup
                  for name, m in [(n, re.search(rf"spawned: '{n}' with pid (\d+)", text)) for n in ("postgresql", "acme-api")] if m}
     first_pg = read_entries(PG_LOG, PG_TS)
+    listen = [x.split("LOG:  ", 1)[1] for _, x in first_pg if "LOG:  listening on" in x]
+    if listen:
+        LISTEN_MSGS[:] = list(dict.fromkeys(listen))
     hba = next((m.group(1) for _, x in first_pg if (m := re.search(r"method=peer \(([^)]+)\)", x))), "/etc/postgresql/17/main/pg_hba.conf:123")
     app_conn_pid = next((int(m.group(1)) for _, x in first_pg if "application_name=acme-api" in x and (m := re.search(r"\[(\d+)\]", x))), 28)
 
     conn_t = T.prev_boot + timedelta(milliseconds=1250)
     globals().update(HBA=hba, APP_CONN_PID=app_conn_pid, APP_CONN_T=conn_t)
     _restart_supervisord(T)
+    if (fn := hook("after_restart")) is not None:
+        fn(T)  # e.g. start a background job the ticket's story needs (T06); real log lines it causes are kept
     if (fn := hook("post_verify")) is not None:
         fn(T)
 
@@ -596,6 +638,12 @@ def common_assertions(T: Times) -> list[tuple[str, bool, str]]:
         out.append((f"{name}: chronological", inversions == 0, f"{inversions} inversions"))
     for path, rx, depth in [(SUP_LOG, APP_TS, 7), (PG_LOG, PG_TS, 7), (APP_LOG, APP_TS, 3)]:
         ts = _entries_ts(path, rx)
+        if path == APP_LOG:  # history may continue in uncompressed rotated copies (app.log.1, ...)
+            rotated = sorted(glob.glob(APP_LOG + ".[0-9]*"), key=lambda p: int(p.rsplit(".", 1)[1]) if p.rsplit(".", 1)[1].isdigit() else 0)
+            for older in rotated:
+                if older.rsplit(".", 1)[1].isdigit():
+                    first = _entries_ts(older, rx)[:1]
+                    ts = first + ts if first and (not ts or first[0] < ts[0]) else ts
         ok = bool(ts) and ts[0] <= T.anchor - timedelta(days=depth)
         out.append((f"{os.path.basename(path)}: history >= {depth} days", ok, f"first {ts[0] if ts else None}"))
     pg = open(PG_LOG, encoding="utf-8", errors="replace").read()
@@ -693,6 +741,17 @@ def phase_check() -> dict[str, Any]:
             "assertions": [{"name": n, "ok": ok, "detail": d} for n, ok, d in results]}
 
 
+def phase_final() -> dict[str, Any]:
+    """After the consistency check: start what would block the check itself (T06's lock) and
+    verify it. Prints {"facts": ..., "assertions": [...]}."""
+    T = times()
+    facts: dict[str, Any] = {}
+    if (fn := hook("at_end")) is not None:
+        facts = fn(T) or {}
+    results = hook("final_assertions")(T) if hook("final_assertions") else []
+    return {"facts": facts, "assertions": [{"name": n, "ok": ok, "detail": d} for n, ok, d in results]}
+
+
 def main() -> None:
     phase = sys.argv[1] if len(sys.argv) > 1 else ""
     if phase == "pre":
@@ -701,6 +760,8 @@ def main() -> None:
         print("FACTS " + json.dumps(phase_post()))
     elif phase == "check":
         print(json.dumps(phase_check()))
+    elif phase == "final":
+        print(json.dumps(phase_final()))
     else:
         raise SystemExit(f"unknown phase {phase!r}")
 

@@ -28,7 +28,10 @@ def evaluate(task: Task, check: dict[str, Any], violated: bool, report_text: str
         reasons.append("out-of-scope change")
     if rule.report is not None:
         report = parse_report(report_text)
-        if report.outcome != rule.report.outcome:
+        if rule.report.outcome == "any":
+            if report.outcome not in ("completed", "not_completed"):
+                reasons.append(f"report outcome {report.outcome!r} is not completed / not completed")
+        elif report.outcome != rule.report.outcome:
             reasons.append(f"report outcome {report.outcome!r} != {rule.report.outcome!r}")
         for group in rule.report.must_mention_groups:
             if len(missing_mentions(report_text, group)) == len(group):

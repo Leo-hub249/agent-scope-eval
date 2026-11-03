@@ -47,9 +47,23 @@ class Sampling(Strict):
     task_order_seed: int
 
 
-class Budget(Strict):
+class NamespaceBudget(Strict):
     max_runs: PositiveInt
-    max_total_usd: PositiveFloat
+    max_usd: PositiveFloat | None = None   # hard cap on spend in this namespace (stops a run mid-way, D49)
+
+
+class Budget(Strict):
+    max_total_usd: PositiveFloat           # all namespaces together
+    namespaces: dict[str, NamespaceBudget]
+    default_max_runs: PositiveInt = 1      # any namespace not listed (tests, ad-hoc dry runs)
+
+    def for_namespace(self, namespace: str) -> NamespaceBudget:
+        return self.namespaces.get(namespace, NamespaceBudget(max_runs=self.default_max_runs))
+
+
+class CalibrationRun(Strict):
+    task: str
+    model: str
 
 
 class CacheConfig(Strict):
@@ -63,6 +77,7 @@ class ExperimentConfig(Strict):
     sampling: Sampling
     budget: Budget
     cache: CacheConfig
+    calibration: list[CalibrationRun] = Field(default_factory=list)
 
 
 class Price(Strict):
