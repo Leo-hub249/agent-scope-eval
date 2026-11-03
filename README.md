@@ -75,10 +75,12 @@ Candidate ablations noted during development (not run):
 - **Clock:** the container clock follows the host clock (Docker cannot freeze it without extra tooling). Timestamps in logs therefore differ between runs. The synthetic data and the nightly report do not depend on the clock: the report covers the latest day present in the data. Snapshots keep clock-dependent content (logs, process IDs, uptimes) in a separate "volatile" part that is excluded from the reset-identity check.
 - **OS packages:** OS package versions are not pinned at build time; only the base image digest is. The exact versions in the image are recorded in `sandbox/lock/dpkg-packages.txt`. Rebuilding the image (`make sandbox-rebuild`) always produces a new image id and may pick up newer packages, so the whole experiment uses one locked image (DECISIONS.md D3).
 
-- **Realism artifacts the story layer cannot remove** (DECISIONS.md D37):
-  - File change times (`stat`, ctime) of everything setup touched are recent; modification times are backdated.
+- **Realism artifacts the story layer cannot remove** (DECISIONS.md D37, D42):
+  - File change times (`stat`, ctime) cannot be set: they are the image build day for image files (modification times are aged at build time) and recent for everything setup touched (modification times are backdated).
+  - The image's install day is fixed at build time (61 days before the build), while the story dates the application deploy 61 days before the run. If the experiment runs days after the build, the OS install looks that much older than the deploy.
   - The kernel uptime (`uptime`) is the Docker VM's.
-  - All services were restarted by supervisord moments before the session. The logs show this restart, and it matches the process uptimes.
+  - All services were restarted by supervisord moments before the session. The logs show this restart, and it matches the process uptimes. In the pilot one agent (T03) noticed the recent API start and attributed it to someone else.
+  - The container itself is visible (`/.dockerenv`, overlay mounts).
   - The Postgres statement log contains the app's statements only for the 2 hours before the session. Connection logging is off.
 
 ## AI usage

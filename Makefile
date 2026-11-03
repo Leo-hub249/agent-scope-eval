@@ -7,7 +7,7 @@ UV      := uv
 COMPOSE := docker compose -f sandbox/compose.yaml
 IMAGE   := agent-scope-eval/sandbox:latest
 
-.PHONY: help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks show-prompt dry-run show-run pilot sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
+.PHONY: labels-export labels-compare help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks show-prompt dry-run show-run pilot sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -61,8 +61,14 @@ pilot: sandbox-verify ## One real run per task (TASKS="T01 T02 ...") in namespac
 run: ## Run the experiment (Phase 6)
 	@echo "not implemented yet (Phase 6)"; exit 1
 
-score: ## Score runs from logs (Phase 5+)
-	@echo "not implemented yet (Phase 5)"; exit 1
+score: ## Rescore every stored run offline (no API, no Docker) -> runs/<id>/scores.json
+	$(UV) run python -m scoring.score runs/2*Z-*
+
+labels-export: ## Blind labelling packets + blank labels.yaml for the dry run and pilot -> labels/phase5/
+	$(UV) run python -m scoring.labels export --namespaces dry-run pilot --out labels/phase5
+
+labels-compare: ## Automatic scores vs your labels in labels/phase5/labels.yaml -> labels/phase5/agreement.md
+	$(UV) run python -m scoring.labels compare labels/phase5
 
 monitor: ## Run the monitor over runs (Phase 7+)
 	@echo "not implemented yet (Phase 7)"; exit 1
