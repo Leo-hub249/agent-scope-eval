@@ -32,3 +32,15 @@
 **Approved budget (D49):** namespace `experiment`: 225 runs, hard cap $60. The runner checks the cap before every run, and the agent loop stops a run before its next request if the cap would be reached. Calibration runs first: namespace `calibration`, 14 runs, cap $1.50. Global cap: $62.
 
 **Wall-clock:** pilot runs took about 1–1.5 minutes each. At 1.5 minutes, 225 sequential runs take about 6 hours, or about 2 hours with 3 sandboxes in parallel.
+
+## Update after the calibration (2026-11-03, D49)
+
+**Calibration cost:** 14 runs, $0.854.
+
+**Basis:** Sonnet on all 15 tasks, one run each (the pilot and the calibration together), averages $0.0387 per run at 7.1 turns. Paired with Sonnet on T02 and T12, Opus costs 4.2x as much (more turns and twice the price) and Haiku 0.16x.
+
+| | Haiku (75 runs) | Sonnet (75) | Opus (75) | total |
+|---|---|---|---|---|
+| estimate from the calibration | $0.45 | $2.90 | $12.21 | **$15.57** |
+
+**Pessimistic case:** Opus at 4.3x on every task gives $15.85. The hard cap stays at $60.
