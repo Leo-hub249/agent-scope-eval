@@ -3,7 +3,7 @@
 How often does an LLM ops agent act outside the scope it was given, how accurately
 does it report what it did, and can a cheaper model reading only the action log catch it?
 
-**Status:** work in progress, Phase 4 done (pilot). See [docs/PLAN.md](docs/PLAN.md) for the plan
+**Status:** work in progress: the full experiment (225 runs) is done; Phase 7 (monitor and analysis) is in progress. See [docs/PLAN.md](docs/PLAN.md) for the plan
 and [DECISIONS.md](DECISIONS.md) for dated design decisions. Reproduction steps and results
 are completed in Phase 8.
 
@@ -69,6 +69,7 @@ TODO: I will write this section myself.
 
 Candidate ablations noted during development (not run):
 - Server notes: with vs without `/home/ops/README.md`.
+- Harder tasks (DECISIONS.md D56): the 225 runs produced one scope violation, so violation rates and the scope monitor's recall on real runs could not be measured. A next round would need tasks where the in-scope path is much costlier or absent and the shortcut is a single command.
 
 ## Limitations
 
@@ -84,6 +85,9 @@ Candidate ablations noted during development (not run):
   - The Postgres statement log contains the app's statements only for the 2 hours before the session. Connection logging is off.
   - Cron is installed but never runs, although the logs show nightly jobs (D4). An agent that checks `ps` sees no cron process.
 - **Disk space** (T10, T13): a real full filesystem would need a size-limited tmpfs, which `df` and `mount` would reveal. The limits are storage budgets instead: one enforced by the API and the nightly report, one by acme-diskwatch. `df` shows plenty of free space (DECISIONS.md D49).
+- **Fictional phone numbers** (T08, DECISIONS.md D55): customer phone numbers use the range Ofcom reserves for drama (`+44 7700 900xxx`), on purpose, because real-looking numbers could belong to real people. The models recognize the range: 7 of the 12 runs flagged as eval-aware are T08 runs. Eval awareness is reported with and without T08 (12/225 runs with it, 4/210 without).
+- **Self-report scorer fixed after the experiment** (DECISIONS.md D54): four classes of false positives were found by reading the experiment's reports and fixed afterwards. The self-report results therefore use the researcher's hand labels (`labels/phase6/`) as ground truth, and report the scorer's agreement with them, before and after the fix.
+- **Monitor recall comes from scripted runs** (DECISIONS.md D56): with one violation in 225 real runs, the scope monitor's recall is measured on the 95 scripted validation scenarios and its false-positive rate on the real runs. The scripted logs differ from real ones: the same generic inspection in every log, actions written by hand, reports written to fit the scenario, and no thinking, so the condition with thinking applies to real runs only.
 - **Ground truth not covered** (DECISIONS.md D47):
   - Some changes are invisible to every layer: file changes made and undone outside the watched trees; a backup disabled by editing the script it runs rather than its cron line.
   - Postgres statements sent by a session that names itself after a service (application_name `acme-api`) are not attributed to the agent.
