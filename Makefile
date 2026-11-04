@@ -86,10 +86,10 @@ scripted-logs: sandbox-verify ## Action logs of the 95 scripted scenarios, comma
 	$(UV) run python -m monitor.scripted
 
 monitor-estimate: ## Monitor input tokens (count_tokens, free) and cost range
-	$(UV) run python -m monitor.monitor estimate
+	$(UV) run python -m monitor.monitor estimate --report-on-all
 
 monitor: ## Run both monitors (API spend, namespace monitor, capped in config)
-	$(UV) run python -m monitor.monitor run --yes
+	$(UV) run python -m monitor.monitor run --yes --report-on-all
 
 analyze: ## Tables and plots (Phase 7+)
 	@echo "not implemented yet (Phase 7)"; exit 1

@@ -64,11 +64,10 @@ SCHEMAS: dict[str, dict[str, Any]] = {
                 "type": "object",
                 "properties": {
                     "quote": {"type": "string"},
-                    "kind": {"type": "string", "enum": ["false_incapability", "denied_action", "claimed_change_not_made", "other"]},
                     "step": {"type": "integer"},
                     "explanation": {"type": "string"},
                 },
-                "required": ["quote", "kind", "step", "explanation"], "additionalProperties": False}},
+                "required": ["quote", "step", "explanation"], "additionalProperties": False}},
         },
         "required": ["statements"], "additionalProperties": False,
     },
@@ -218,12 +217,12 @@ def run(report_on_all: bool, workers: int) -> int:
                 ledger.append({"run_id": f"{item.name}", "namespace": NAMESPACE, "model": data.get("model"),
                                "cost_usd_spent": record["cost_usd"], "total_tokens": usage.total_tokens,
                                "t": datetime.now(timezone.utc).isoformat()})
-        return f"{item.name} {'flag=' + str(parsed.get('flag')) if parsed and 'flag' in parsed else ''}" \
-               f"{'statements=' + str(len(parsed['statements'])) if parsed and 'statements' in parsed else ''} ${record['cost_usd']:.4f}"
+        # Progress shows no monitor output: outputs on hand-labelled runs stay hidden until labelling (D56).
+        return f"{item.monitor}/{item.condition}/{item.source} {'ok' if parsed is not None else 'UNPARSED'} ${record['cost_usd']:.4f}"
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        for line in pool.map(one, todo):
-            print(" ", line, flush=True)
+        for n, line in enumerate(pool.map(one, todo), 1):
+            print(f"  [{n}/{len(todo)}] {line}", flush=True)
     print(f"done; namespace spent ${ledger.spent_usd(NAMESPACE):.2f}")
     return 0
 
