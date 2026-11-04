@@ -30,7 +30,7 @@ from tasks.instructions import evaluate_flags, evaluate_instructions
 from tasks.schema import TaskBundle, load_all
 from tasks.success import evaluate as evaluate_success
 
-SCORING_VERSION = 2
+SCORING_VERSION = 3
 
 
 def _load(run_dir: Path, name: str) -> Any:

@@ -22,3 +22,11 @@ def test_kappa() -> None:
     assert cohen_kappa([(True, True), (False, False)]) == pytest.approx(1.0)
     assert cohen_kappa([(True, True), (True, True)]) is None  # one class only: undefined
     assert cohen_kappa([(True, False), (False, True)]) == pytest.approx(-1.0)
+
+
+def test_statement_kinds() -> None:
+    from scoring.labels import _statement_kinds
+    assert _statement_kinds([]) == frozenset() and _statement_kinds(None) is None
+    assert _statement_kinds([{"quote": "x", "kind": "false incapability"}]) == {"false_incapability"}
+    with pytest.raises(ValueError):
+        _statement_kinds([{"quote": "x", "kind": "lie"}])

@@ -7,7 +7,7 @@ UV      := uv
 COMPOSE := docker compose -f sandbox/compose.yaml
 IMAGE   := agent-scope-eval/sandbox:latest
 
-.PHONY: calibrate labels-export labels-compare help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks show-prompt dry-run show-run pilot sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
+.PHONY: calibrate labels-export labels-compare labels6-export labels6-compare before-after scripted-logs monitor-estimate help setup sandbox sandbox-rebuild sandbox-verify sandbox-test validate-tasks show-prompt dry-run show-run pilot sandbox-shell sandbox-clean lock-sandbox test run score monitor analyze
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -73,8 +73,23 @@ labels-export: ## Blind labelling packets + blank labels.yaml for the dry run an
 labels-compare: ## Automatic scores vs your labels in labels/phase5/labels.yaml -> labels/phase5/agreement.md
 	$(UV) run python -m scoring.labels compare labels/phase5
 
-monitor: ## Run the monitor over runs (Phase 7+)
-	@echo "not implemented yet (Phase 7)"; exit 1
+labels6-export: ## Blind self-report packets for the experiment (D54) -> labels/phase6/
+	$(UV) run python -m scoring.labels export-phase6
+
+labels6-compare: ## Self-report scores (current and v2) vs your labels in labels/phase6 -> labels/phase6/agreement.md
+	$(UV) run python -m scoring.labels compare labels/phase6
+
+before-after: ## Every metric before and after the D54 scorer fix -> results/scoring/d54_before_after.md
+	$(UV) run python -m analysis.before_after
+
+scripted-logs: sandbox-verify ## Action logs of the 95 scripted scenarios, command by command (Docker, no API) -> runs/scripted/
+	$(UV) run python -m monitor.scripted
+
+monitor-estimate: ## Monitor input tokens (count_tokens, free) and cost range
+	$(UV) run python -m monitor.monitor estimate
+
+monitor: ## Run both monitors (API spend, namespace monitor, capped in config)
+	$(UV) run python -m monitor.monitor run --yes
 
 analyze: ## Tables and plots (Phase 7+)
 	@echo "not implemented yet (Phase 7)"; exit 1

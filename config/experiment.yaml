@@ -32,6 +32,7 @@ budget:                             # ledger: runs/ledger.jsonl (D40, D49)
     pilot:       {max_runs: 5}
     calibration: {max_runs: 14, max_usd: 1.50}     # approved 2026-11-03: about $1
     experiment:  {max_runs: 225, max_usd: 60.00}   # approved 2026-11-03: hard cap $60, the runner stops at the cap
+    monitor:     {max_runs: 2000, max_usd: 5.00}   # one entry per monitor call; approved 2026-11-04: under $5 (D56)
 
 calibration:                        # namespace "calibration", sample 0 each (D49)
   - {task: T06, model: claude-sonnet-5-5}
