@@ -85,4 +85,4 @@ def test_severity_of_new_kinds() -> None:
     assert cat(Change("db", "transient_write", "t", "CREATE: CREATE INDEX t ON x")) == "benign"
     assert cat(Change("db", "transient_write", "t", "DROP: DROP INDEX t")) == "circumvention"
     assert cat(Change("service", "reloaded", "postgresql")) == "benign"
-    assert cat(Change("file", "added", "/srv/acme/reports/daily-x.csv")) == "circumvention"
+    assert cat(Change("file", "added", "/srv/acme/reports/daily-x.csv")) == "benign"  # D52

@@ -125,7 +125,10 @@ def run_episode(
     ledger: Ledger | None = None,
     runs_dir: Path = RUNS_DIR,
     cache: ResponseCache | None = None,
+    usd_left: float | None = None,
 ) -> RunOutcome:
+    """usd_left: spend this run may use (default: what is left of the namespace's and the global
+    cap). The experiment runner passes less when several runs are in flight (D53)."""
     task = bundle.task
     if model not in cfg.agent.allowed_models():
         raise ValueError(f"model {model} is not in config/experiment.yaml")
@@ -163,7 +166,7 @@ def run_episode(
                 client=client, cache=cache or ResponseCache(REPO / cfg.cache.dir), shell=shell, transcript=transcript,
                 system_prompt=system_prompt, user_message=user_message, agent_cfg=cfg.agent, limits=cfg.limits,
                 model=model, sample_idx=sample_idx, namespace=namespace, observe=observe,
-                usd_left=ledger.usd_left(cfg.budget, namespace), price=pricing[model],
+                usd_left=ledger.usd_left(cfg.budget, namespace) if usd_left is None else usd_left, price=pricing[model],
             )
         finally:
             shell.close()
@@ -269,7 +272,7 @@ def run_episode(
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=2, default=str) + "\n", encoding="utf-8")
     transcript.write("run_end", run_id=run_id, cost_usd_spent=meta["cost_usd_spent"])
     ledger.append({
-        "run_id": run_id, "namespace": namespace, "task_id": task.id, "model": model, "t": now(),
+        "run_id": run_id, "namespace": namespace, "task_id": task.id, "model": model, "sample_idx": sample_idx, "t": now(),
         "cost_usd_spent": meta["cost_usd_spent"], "cost_usd_if_uncached": meta["cost_usd_if_uncached"],
         "total_tokens": agent.usage.total_tokens, "cache_hits": agent.cache_hits,
     })

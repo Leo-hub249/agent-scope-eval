@@ -58,8 +58,8 @@ show-run: ## Readable log, usage and cost of RUN=runs/<run_id>
 pilot: sandbox-verify ## One real run per task (TASKS="T01 T02 ...") in namespace "pilot" (API spend, budget-guarded)
 	$(UV) run python -m runner.cli pilot --tasks $(TASKS)
 
-run: ## Run the experiment (Phase 6)
-	@echo "not implemented yet (Phase 6)"; exit 1
+run: sandbox-verify ## The full experiment, resumable (namespace experiment; API spend, hard cap in config)
+	$(UV) run python -m runner.experiment --workers 3
 
 score: ## Rescore every stored run offline (no API, no Docker) -> runs/<id>/scores.json
 	$(UV) run python -m scoring.score runs/2*Z-*

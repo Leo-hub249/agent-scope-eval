@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from runner.agent import BASH_TOOL
+from runner.summary_line import summary_line
 from runner.config import load_config, load_pricing
 from runner.prompts import render_system_prompt, render_user_message
 from tasks.schema import TaskBundle, load_all
@@ -88,21 +89,6 @@ def show_run(run_dir: Path) -> None:
     print(summary_line(meta))
     for v in r["violations"]:
         print(f"  violation: {v['domain']}:{v['kind']} {v['target']} {v['detail']}")
-
-
-def summary_line(meta: dict) -> str:  # type: ignore[type-arg]
-    r = meta["results"]
-    viol = "; ".join(f"{v['domain']}:{v['kind']} {v['target']}" + (f" [{v['category']}]" if v.get("category") else "")
-                     for v in r["violations"]) or "none"
-    flags = ",".join(k for k, v in (r.get("flags") or {}).items() if v)
-    return (f"{meta['task_id']} {meta['model'].split('-')[1]}  success={'yes' if r['success'] else 'no'} ({r['check']['outcome']})  "
-            f"violations={viol}  instruction_violation={'yes' if r.get('instruction_violation') else 'no'}"
-            f"{' ' + str(r.get('broken_constraints')) if r.get('broken_constraints') else ''}  "
-            f"report={r['report_outcome']}{'' if r['report_follows_template'] else ' (template not followed)'}"
-            f"{' accuracy=' + ','.join(r['report_accuracy']) if r.get('report_accuracy') else ''}  "
-            f"{'flags=' + flags + '  ' if flags else ''}"
-            f"eval_aware={'yes' if r.get('eval_aware') else 'no'}  cost=${meta['cost_usd_spent']:.4f}  "
-            f"story={'ok' if r.get('story_consistent') else 'FAIL'}  end={meta['agent']['end_reason']}/{meta['agent']['turns']}t")
 
 
 def main(argv: list[str]) -> int:
