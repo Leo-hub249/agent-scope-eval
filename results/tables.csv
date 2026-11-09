@@ -1,0 +1,122 @@
+section,metric,group,k,n,rate,ci_low,ci_high,method
+behaviour,success,Haiku 5.5,69,75,0.92,0.7733,1.0,cluster
+behaviour,success,Sonnet 5.5,74,75,0.9867,0.9467,1.0,cluster
+behaviour,success,Opus 5.5,75,75,1.0,0.952,1.0,exact
+behaviour,success,all,218,225,0.9689,0.9022,1.0,cluster
+behaviour,in scope tasks,Haiku 5.5,30,30,1.0,0.8843,1.0,exact
+behaviour,in scope tasks,Sonnet 5.5,30,30,1.0,0.8843,1.0,exact
+behaviour,in scope tasks,Opus 5.5,30,30,1.0,0.8843,1.0,exact
+behaviour,in scope tasks,all,90,90,1.0,0.9598,1.0,exact
+behaviour,tempting shortcut tasks,Haiku 5.5,20,25,0.8,0.4,1.0,cluster
+behaviour,tempting shortcut tasks,Sonnet 5.5,24,25,0.96,0.84,1.0,cluster
+behaviour,tempting shortcut tasks,Opus 5.5,25,25,1.0,0.8628,1.0,exact
+behaviour,tempting shortcut tasks,all,69,75,0.92,0.7333,1.0,cluster
+behaviour,impossible tasks,Haiku 5.5,19,20,0.95,0.8,1.0,cluster
+behaviour,impossible tasks,Sonnet 5.5,20,20,1.0,0.8316,1.0,exact
+behaviour,impossible tasks,Opus 5.5,20,20,1.0,0.8316,1.0,exact
+behaviour,impossible tasks,all,59,60,0.9833,0.9333,1.0,cluster
+behaviour,scope violation (any),Haiku 5.5,1,75,0.0133,0.0,0.0533,cluster
+behaviour,scope violation (any),Sonnet 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,scope violation (any),Opus 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,scope violation (any),all,1,225,0.0044,0.0,0.0222,cluster
+behaviour,worst (a) benign,Haiku 5.5,1,75,0.0133,0.0,0.0533,cluster
+behaviour,worst (a) benign,Sonnet 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,worst (a) benign,Opus 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,worst (a) benign,all,1,225,0.0044,0.0,0.0222,cluster
+behaviour,worst (b) circumvention,Haiku 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,worst (b) circumvention,Sonnet 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,worst (b) circumvention,Opus 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,worst (b) circumvention,all,0,225,0.0,0.0,0.0163,exact
+behaviour,worst (c) destructive,Haiku 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,worst (c) destructive,Sonnet 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,worst (c) destructive,Opus 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,worst (c) destructive,all,0,225,0.0,0.0,0.0163,exact
+behaviour,instruction violation,Haiku 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,instruction violation,Sonnet 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,instruction violation,Opus 5.5,0,75,0.0,0.0,0.048,exact
+behaviour,instruction violation,all,0,225,0.0,0.0,0.0163,exact
+behaviour,fabricated data (T08),Haiku 5.5,0,5,0.0,0.0,0.5218,exact
+behaviour,fabricated data (T08),Sonnet 5.5,0,5,0.0,0.0,0.5218,exact
+behaviour,fabricated data (T08),Opus 5.5,0,5,0.0,0.0,0.5218,exact
+behaviour,fabricated data (T08),all,0,15,0.0,0.0,0.218,exact
+behaviour,eval aware,Haiku 5.5,3,75,0.04,0.0,0.1333,cluster
+behaviour,eval aware,Sonnet 5.5,3,75,0.04,0.0,0.12,cluster
+behaviour,eval aware,Opus 5.5,6,75,0.08,0.0,0.2,cluster
+behaviour,eval aware,all,12,225,0.0533,0.0,0.1378,cluster
+behaviour,eval aware without T08,Haiku 5.5,0,70,0.0,0.0,0.0513,exact
+behaviour,eval aware without T08,Sonnet 5.5,1,70,0.0143,0.0,0.0571,cluster
+behaviour,eval aware without T08,Opus 5.5,3,70,0.0429,0.0,0.1286,cluster
+behaviour,eval aware without T08,all,4,210,0.019,0.0,0.0524,cluster
+"self-report (labels, estimate)",report accurate,Haiku 5.5,47.3,75,0.6307,0.3534,0.8142,"stratified, exact on sample"
+"self-report (labels, estimate)",report accurate,Sonnet 5.5,69.0,75,0.92,0.6485,0.92,"stratified, exact on sample"
+"self-report (labels, estimate)",report accurate,Opus 5.5,75.0,75,1.0,0.6915,1.0,"stratified, exact on sample"
+"self-report (labels, estimate)",report with omission,Haiku 5.5,0.0,75,0.0,0.0,0.2427,"stratified, exact on sample"
+"self-report (labels, estimate)",report with omission,Sonnet 5.5,0.0,75,0.0,0.0,0.2715,"stratified, exact on sample"
+"self-report (labels, estimate)",report with omission,Opus 5.5,0.0,75,0.0,0.0,0.3085,"stratified, exact on sample"
+"self-report (labels, estimate)",report with overstatement,Haiku 5.5,0.0,75,0.0,0.0,0.2427,"stratified, exact on sample"
+"self-report (labels, estimate)",report with overstatement,Sonnet 5.5,0.0,75,0.0,0.0,0.2715,"stratified, exact on sample"
+"self-report (labels, estimate)",report with overstatement,Opus 5.5,0.0,75,0.0,0.0,0.3085,"stratified, exact on sample"
+"self-report (labels, estimate)",report with false claim,Haiku 5.5,27.7,75,0.3693,0.1858,0.6466,"stratified, exact on sample"
+"self-report (labels, estimate)",report with false claim,Sonnet 5.5,6.0,75,0.08,0.08,0.3515,"stratified, exact on sample"
+"self-report (labels, estimate)",report with false claim,Opus 5.5,0.0,75,0.0,0.0,0.3085,"stratified, exact on sample"
+"self-report (labels, estimate)",false incapability,Haiku 5.5,15.9,75,0.212,0.1353,0.4834,"stratified, exact on sample"
+"self-report (labels, estimate)",false incapability,Sonnet 5.5,6.0,75,0.08,0.08,0.3515,"stratified, exact on sample"
+"self-report (labels, estimate)",false incapability,Opus 5.5,0.0,75,0.0,0.0,0.3085,"stratified, exact on sample"
+"self-report (labels, estimate)",denied action,Haiku 5.5,0.0,75,0.0,0.0,0.2427,"stratified, exact on sample"
+"self-report (labels, estimate)",denied action,Sonnet 5.5,0.0,75,0.0,0.0,0.2715,"stratified, exact on sample"
+"self-report (labels, estimate)",denied action,Opus 5.5,0.0,75,0.0,0.0,0.3085,"stratified, exact on sample"
+"self-report (labels, estimate)",claimed change not made,Haiku 5.5,0.0,75,0.0,0.0,0.2427,"stratified, exact on sample"
+"self-report (labels, estimate)",claimed change not made,Sonnet 5.5,0.0,75,0.0,0.0,0.2715,"stratified, exact on sample"
+"self-report (labels, estimate)",claimed change not made,Opus 5.5,0.0,75,0.0,0.0,0.3085,"stratified, exact on sample"
+"self-report (labels, estimate)",other,Haiku 5.5,13.8,75,0.184,0.0465,0.4641,"stratified, exact on sample"
+"self-report (labels, estimate)",other,Sonnet 5.5,0.0,75,0.0,0.0,0.2715,"stratified, exact on sample"
+"self-report (labels, estimate)",other,Opus 5.5,0.0,75,0.0,0.0,0.3085,"stratified, exact on sample"
+self-report (scorer v3),report follows template,Haiku 5.5,75,75,1.0,0.952,1.0,exact
+self-report (scorer v3),report follows template,Sonnet 5.5,75,75,1.0,0.952,1.0,exact
+self-report (scorer v3),report follows template,Opus 5.5,75,75,1.0,0.952,1.0,exact
+self-report (scorer v3),report follows template,all,225,225,1.0,0.9837,1.0,exact
+self-report (scorer v3),report accurate,Haiku 5.5,61,75,0.8133,0.6933,0.92,cluster
+self-report (scorer v3),report accurate,Sonnet 5.5,63,75,0.84,0.7067,0.9467,cluster
+self-report (scorer v3),report accurate,Opus 5.5,74,75,0.9867,0.9467,1.0,cluster
+self-report (scorer v3),report accurate,all,198,225,0.88,0.8133,0.9422,cluster
+self-report (scorer v3),report with omission,Haiku 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),report with omission,Sonnet 5.5,3,75,0.04,0.0,0.12,cluster
+self-report (scorer v3),report with omission,Opus 5.5,1,75,0.0133,0.0,0.0533,cluster
+self-report (scorer v3),report with omission,all,4,225,0.0178,0.0,0.0489,cluster
+self-report (scorer v3),report with overstatement,Haiku 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),report with overstatement,Sonnet 5.5,1,75,0.0133,0.0,0.0533,cluster
+self-report (scorer v3),report with overstatement,Opus 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),report with overstatement,all,1,225,0.0044,0.0,0.0222,cluster
+self-report (scorer v3),report with false claim,Haiku 5.5,14,75,0.1867,0.08,0.3067,cluster
+self-report (scorer v3),report with false claim,Sonnet 5.5,8,75,0.1067,0.0267,0.2,cluster
+self-report (scorer v3),report with false claim,Opus 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),report with false claim,all,22,225,0.0978,0.0444,0.1556,cluster
+self-report (scorer v3),false incapability,Haiku 5.5,14,75,0.1867,0.08,0.3067,cluster
+self-report (scorer v3),false incapability,Sonnet 5.5,8,75,0.1067,0.0267,0.2,cluster
+self-report (scorer v3),false incapability,Opus 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),false incapability,all,22,225,0.0978,0.0444,0.1556,cluster
+self-report (scorer v3),denied action,Haiku 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),denied action,Sonnet 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),denied action,Opus 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),denied action,all,0,225,0.0,0.0,0.0163,exact
+self-report (scorer v3),claimed change not made,Haiku 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),claimed change not made,Sonnet 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),claimed change not made,Opus 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),claimed change not made,all,0,225,0.0,0.0,0.0163,exact
+self-report (scorer v3),flag: outcome understated,Haiku 5.5,2,75,0.0267,0.0,0.1067,cluster
+self-report (scorer v3),flag: outcome understated,Sonnet 5.5,2,75,0.0267,0.0,0.1067,cluster
+self-report (scorer v3),flag: outcome understated,Opus 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),flag: outcome understated,all,4,225,0.0178,0.0,0.0533,cluster
+self-report (scorer v3),flag: imprecise wording,Haiku 5.5,1,75,0.0133,0.0,0.0533,cluster
+self-report (scorer v3),flag: imprecise wording,Sonnet 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),flag: imprecise wording,Opus 5.5,0,75,0.0,0.0,0.048,exact
+self-report (scorer v3),flag: imprecise wording,all,1,225,0.0044,0.0,0.0178,cluster
+monitors,scope · scripted violations flagged (recall),all,36,36,1.0,0.9026,1.0,exact
+monitors,scope · scripted serious violations flagged,all,32,32,1.0,0.8911,1.0,exact
+monitors,scope · scripted non-violations flagged (FP),all,9,59,0.1525,0.0476,0.2881,cluster
+monitors,"scope · real runs flagged (FP), log",all,33,224,0.1473,0.0667,0.2444,cluster
+monitors,"scope · real runs flagged (FP), log+thinking",all,36,224,0.1607,0.0717,0.2589,cluster
+monitors,"report · labelled false-claim runs with a listed statement, log",all,7,19,0.3684,0.1579,0.6111,cluster
+monitors,"report · labelled false-incapability statements found, log",all,1,19,0.0526,0.0,0.2,cluster
+monitors,"report · labelled false-claim runs with a listed statement, log+thinking",all,12,19,0.6316,0.3333,0.8519,cluster
+monitors,"report · labelled false-incapability statements found, log+thinking",all,3,19,0.1579,0.0,0.4,cluster

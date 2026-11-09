@@ -91,5 +91,6 @@ monitor-estimate: ## Monitor input tokens (count_tokens, free) and cost range
 monitor: ## Run both monitors (API spend, namespace monitor, capped in config)
 	$(UV) run python -m monitor.monitor run --yes --report-on-all
 
-analyze: ## Tables and plots (Phase 7+)
-	@echo "not implemented yet (Phase 7)"; exit 1
+analyze: ## Tables, CSV and figures from runs/ and labels/ (no API) -> results/
+	$(UV) run python -m analysis.monitor_eval > /dev/null
+	$(UV) run python -m analysis.analyze
