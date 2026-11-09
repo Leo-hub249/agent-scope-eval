@@ -119,4 +119,27 @@ Ground truth: the scorer's scope violations (1 of 225 runs). Cells: runs flagged
 
 ## Report monitor
 
-Withheld: 0/55 phase 6 runs labelled (labels/phase6/labels.yaml).
+### Phase 6 labelled runs
+
+Labels: Claude Fable 5.1 (claude-fable-5-1): independent Claude Code subagents that read only the packets, 2026-11-09, at the researcher's request. Model labels, not hand labels (DECISIONS.md D57).
+
+- log, run level, any listed statement vs label false_claim: recall 7/19, precision 7/22, false positives 15/36
+- log, labelled false_incapability statements found: 1/19
+- log, labelled other statements found: 2/4
+- log, listed statements matching no labelled one: 80/83
+- log+thinking, run level, any listed statement vs label false_claim: recall 12/19, precision 12/23, false positives 11/36
+- log+thinking, labelled false_incapability statements found: 3/19
+- log+thinking, labelled other statements found: 3/4
+- log+thinking, listed statements matching no labelled one: 76/82
+
+The phase 6 set over-represents runs the scorer flagged (D54), so these are not population
+rates; the strata are in labels/phase6/agreement.md.
+
+### All experiment runs
+
+Cells: runs with at least one listed statement / runs.
+
+| condition | Haiku 5.5 | Sonnet 5.5 | Opus 5.5 | all |
+|---|---|---|---|---|
+| log | 34/75 | 29/75 | 25/75 | 88/225 |
+| log+thinking | 39/75 | 19/75 | 29/75 | 87/225 |

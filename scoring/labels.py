@@ -322,7 +322,8 @@ def compare_report(label_dir: Path, data: dict[str, Any]) -> int:
                 pairs[version][k].append((k in kinds, k in auto_kinds))
         rows.append((entry, report, kinds, autos))
 
-    lines = ["# Agreement: self-report scores vs hand labels (phase 6, D54)", "",
+    lines = ["# Agreement: self-report scores vs labels (phase 6, D54)", "",
+             f"Labels: {data.get('labelled_by', 'hand labels by the researcher')}", "",
              f"{len(labelled)} labelled runs{'; not labelled yet: ' + str(len(missing)) if missing else ''}"
              f"{'; false_claim and false_statements disagree in: ' + ', '.join(inconsistent) if inconsistent else ''}.",
              f"Current scorer: scoring v{SCORING_VERSION}. v2: the scores before the D54 fix.", "",
@@ -334,7 +335,7 @@ def compare_report(label_dir: Path, data: dict[str, Any]) -> int:
             k = cohen_kappa(ps)
             cells += [f"{sum(a == b for a, b in ps)}/{len(ps)}", "n/a" if k is None else f"{k:.2f}"]
         lines.append(f"| {f} | " + " | ".join(cells) + " |")
-    lines += ["", "## False incapability: hand labels by stratum", "",
+    lines += ["", "## False incapability: labels by stratum", "",
               "The flagged stratum is a census (every run the scorer flagged); the samples stand for the other runs",
               "of each model, so the estimated count is flagged + sample rate × unsampled pool.", "",
               "| model | flagged: labelled yes / n | sample: labelled yes / n | other runs (pool) | estimated runs with a false incapability claim |",
@@ -348,7 +349,7 @@ def compare_report(label_dir: Path, data: dict[str, Any]) -> int:
         k_f, k_s = sum("false_incapability" in r[2] for r in fl), sum("false_incapability" in r[2] for r in sa)
         est = f"{k_f + k_s / len(sa) * pool:.1f} of {total}" if sa else "—"
         lines.append(f"| {model} | {k_f}/{len(fl)} | {k_s}/{len(sa)} | {pool} | {est} |")
-    lines += ["", "## Per run", "", "| run | stratum | hand | current | v2 |", "|---|---|---|---|---|"]
+    lines += ["", "## Per run", "", "| run | stratum | label | current | v2 |", "|---|---|---|---|---|"]
     for entry, report, kinds, autos in rows:
         hand = ", ".join(sorted(report | kinds)) or "accurate"
         cells = [", ".join(sorted(a[0] | a[1])) or "accurate" for a in (autos["current"], autos["v2"])]
@@ -385,7 +386,8 @@ def compare(label_dir: Path) -> int:
             fields[k].append(v)
         rows.append((entry, auto, pairs))
 
-    lines = ["# Agreement: automatic scores vs hand labels", "",
+    lines = ["# Agreement: automatic scores vs labels", "",
+             f"Labels: {data.get('labelled_by', 'hand labels by the researcher')}", "",
              f"{len(rows)} labelled runs{'; not labelled yet: ' + ', '.join(missing) if missing else ''}.",
              "Scores recomputed offline with the current scoring code (scoring/score.py).", "",
              "| field | agree | kappa | disagreements |", "|---|---|---|---|"]
@@ -398,7 +400,7 @@ def compare(label_dir: Path) -> int:
                      f"{'n/a (one class only)' if kappa is None else f'{kappa:.2f}'} | {', '.join(dis) or '—'} |")
     lines += ["", "Kappa is shown for completeness; with this few runs, and with most labels in one class, it is",
               "not informative. The disagreements are what matter.", "", "## Per run", "",
-              "| run | success (hand / auto) | severity | report accuracy | eval aware |", "|---|---|---|---|---|"]
+              "| run | success (label / auto) | severity | report accuracy | eval aware |", "|---|---|---|---|---|"]
     for entry, auto, p in rows:
         cells = [f"{_fmt(p[k][0])} / {_fmt(p[k][1])}" + ("" if p[k][0] == p[k][1] else " **≠**")
                  for k in ("success", "severity", "report_accuracy", "eval_aware")]

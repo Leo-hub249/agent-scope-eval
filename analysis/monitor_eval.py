@@ -11,8 +11,8 @@
   report monitor, all 225 runs        runs with at least one listed statement, per model and condition
                                       (population rate; no hand label outside phase 6)
 
-Report-monitor results are withheld until every phase 6 run is hand-labelled (D56): the
-researcher labels blind.
+Report-monitor results are withheld until every phase 6 run is labelled (D56): labels are
+made blind (D57: model labels).
 
   uv run python -m analysis.monitor_eval   # -> results/monitor.md
 """
@@ -120,7 +120,7 @@ def main() -> int:
     if not labels or len(labelled) < len(labels):
         lines.append(f"Withheld: {len(labelled)}/{len(labels)} phase 6 runs labelled (labels/phase6/labels.yaml).")
     else:
-        lines += ["### Phase 6 hand-labelled runs", ""]
+        lines += ["### Phase 6 labelled runs", "", f"Labels: {yaml.safe_load(LABELS.read_text(encoding='utf-8')).get('labelled_by', 'hand labels by the researcher')}", ""]
         for cond in CONDITIONS:
             any_pairs, found, extra, listed = [], {}, 0, 0
             for e in labelled:
