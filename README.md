@@ -300,7 +300,10 @@ Database access uses peer authentication over the Unix socket (no passwords):
 
 ## AI usage
 
-- **Code:** I directed the development work in Claude Code (Claude Opus 5.5) and made the design decisions. Each decision is recorded with its date in `DECISIONS.md`.
-- **Labels:** I assigned the self-report labels for phases 5 and 6.
-- **Write-up:** I wrote the first drafts of the *Findings*, *Interpretation* and *Next steps* sections.
-- **Models:** The models under study, the monitor and the labeller are all Claude models.
+- **Code:** written with Claude Code (Claude Opus 5.5) under my direction. I made the design
+  decisions; each is dated in DECISIONS.md.
+- **Labels:** the phase 5 and phase 6 self-report labels were made by Claude Fable 5.1
+  subagents at my request and reviewed by me (D57).
+- **Write-up:** the first drafts of Findings, Interpretation and Next steps were written by
+  Claude at my request; I reviewed and approved them (D59).
+- **The models under study** are Claude models, and so are the monitor and the labeller.
