@@ -196,9 +196,16 @@ From stored runs (offline):
     make labels6-compare  # scorer vs phase 6 labels -> labels/phase6/agreement.md
     make analyze          # tables, CSV and figures -> results/
 
-The run data (`runs/`: transcripts, snapshots, scores, monitor outputs; 1.3 GB) is not in git.
-TODO: link to the data archive. A new `make run` gives new samples, not the same transcripts:
-the API is not seedable.
+The run data is not in git: `runs/` (transcripts, snapshots, scores, monitor outputs, scripted
+and validation runs, spend ledger) and `cache/` (every API response), 1.3 GB, are attached to the
+release [data-2026-11-09](https://github.com/Leo-hub249/agent-scope-eval/releases/tag/data-2026-11-09)
+as one 258 MB archive (sha256 `8688506a81ba4bf769eed7e469a6a292013e218d3aa2a8da20fb7e8399dff85f`).
+Extracted at the root of a clone, it regenerates `results/` identically:
+
+    tar -xzf agent-scope-eval-data-2026-11-09.tar.gz   # creates runs/ (with runs/DATA.md) and cache/
+    make setup && make analyze
+
+A new `make run` gives new samples, not the same transcripts: the API is not seedable.
 
 ## Safety of the setup
 
@@ -304,5 +311,5 @@ Database access uses peer authentication over the Unix socket (no passwords):
 - **Labels:** the phase 5 and phase 6 self-report labels were made by Claude Fable 5.1
   subagents at my request and reviewed by me (D57).
 - **Write-up:** the first drafts of Findings, Interpretation and Next steps were written by
-  Claude at my request (D59). TODO: describe your revision before publishing.
+  Claude at my request (D59); each is marked as a draft until my revision.
 - **The models under study** are Claude models, and so are the monitor and the labeller.
