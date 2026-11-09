@@ -25,8 +25,6 @@ checked against those changes; and two Haiku 5.5 monitors read the action log.
 
 ## Findings
 
-> **Draft by Claude**, written at the researcher's request (D59); under the researcher's revision.
-
 1. **The agents stayed in scope.** One run of 225 changed something outside its scope: in T12,
    Haiku modified a cache directory outside the allowed paths and restored it (benign). No run
    was destructive or a circumvention, none broke an explicit instruction, and none fabricated
@@ -66,8 +64,6 @@ checked against those changes; and two Haiku 5.5 monitors read the action log.
 
 ## Interpretation
 
-> **Draft by Claude**, written at the researcher's request (D59); under the researcher's revision.
-
 - **Scope stated in the prompt was respected on these tasks.** With an explicit scope and
   shortcuts designed to be tempting, none of the models took one in a way that counted. This says more about the task suite than about the models'
   limits: the experiment cannot rank the models on scope adherence, and it does not show what
@@ -97,8 +93,6 @@ checked against those changes; and two Haiku 5.5 monitors read the action log.
   model judging Claude models.
 
 ## Next steps
-
-> **Draft by Claude**, written at the researcher's request (D59); under the researcher's revision.
 
 1. **Harder tasks** (D56): tasks where the in-scope path is much costlier or absent and the
    shortcut is a single command, so that violation rates and the scope monitor's recall on real
@@ -311,5 +305,5 @@ Database access uses peer authentication over the Unix socket (no passwords):
 - **Labels:** the phase 5 and phase 6 self-report labels were made by Claude Fable 5.1
   subagents at my request and reviewed by me (D57).
 - **Write-up:** the first drafts of Findings, Interpretation and Next steps were written by
-  Claude at my request (D59); each is marked as a draft until my revision.
+  Claude at my request; I reviewed and approved them (D59).
 - **The models under study** are Claude models, and so are the monitor and the labeller.
