@@ -540,3 +540,8 @@ After the calibration (2026-11-03).
 - **Monitors:** the same cluster bootstrap over tasks (scripted scenarios and labelled statements are grouped by task).
 - **Figures, chosen after the data were seen:** the planned violation-rate plot was dropped (1 violation in 225 runs; the rate stays in the table), and the report-error breakdown became a single false-incapability plot, because the labels found no omissions or overstatements (the remaining kind, "other", is in the table). Added: success by task kind. Static PNGs, reference palette of the dataviz method (three validated categorical slots), light mode only.
 - **Outputs:** `results/tables.md`, `results/tables.csv` (one row per cell with k, n, rate, interval and method), `results/figures/*.png`. Dependencies added: numpy 2.5.4, matplotlib 3.11.2.
+
+## D59 · 2026-11-09 · Phase 8 README: Findings, Interpretation and Next steps drafted by Claude
+- **What changed:** the plan (Phase 1) left Findings, Interpretation and Next steps to the researcher. The researcher asked Claude to draft them and will review and correct them. Each of the three sections carries a visible "Draft by Claude" note until the researcher's revision, and the README's AI usage section says who wrote what.
+- **How the drafts were written:** every number comes from the generated results (`results/tables.md`, `results/monitor.md`, `labels/phase6/agreement.md`) or from a check run on the stored runs and reported with it (the permission-denied and sudo counts for the false-incapability runs; the keyword count of the scope monitor's self-described in-scope changes).
+- **Open before publishing:** the researcher's revision of the three sections; the AI usage line on that revision; a link to an archive of `runs/` (1.3 GB, not in git).
